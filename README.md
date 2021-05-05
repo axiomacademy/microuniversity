@@ -1,2 +1,2 @@
-# microuniversity-prototype
+# microuniversity
 The prototype platform implementation of the Axiom v0.2 micro university

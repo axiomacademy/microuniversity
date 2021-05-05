@@ -1,60 +1,42 @@
 <template>
-  <v-app>
-    <v-app-bar
-      app
-      color="primary"
-      dark
-    >
-      <div class="d-flex align-center">
-        <v-img
-          alt="Vuetify Logo"
-          class="shrink mr-2"
-          contain
-          src="https://cdn.vuetifyjs.com/images/logos/vuetify-logo-dark.png"
-          transition="scale-transition"
-          width="40"
-        />
-
-        <v-img
-          alt="Vuetify Name"
-          class="shrink mt-1 hidden-sm-and-down"
-          contain
-          min-width="100"
-          src="https://cdn.vuetifyjs.com/images/logos/vuetify-name-dark.png"
-          width="100"
-        />
-      </div>
-
-      <v-spacer></v-spacer>
-
-      <v-btn
-        href="https://github.com/vuetifyjs/vuetify/releases/latest"
-        target="_blank"
-        text
-      >
-        <span class="mr-2">Latest Release</span>
-        <v-icon>mdi-open-in-new</v-icon>
-      </v-btn>
-    </v-app-bar>
-
-    <v-main>
-      <HelloWorld/>
-    </v-main>
-  </v-app>
+  <div class="wrapper bg-purple-50 min-h-screen p-4">
+    <nav class="p-4 border-b border-gray-200">
+      <ul class="flex flex-row items-center">
+        <img src="./assets/logo-transparent-dark.png" class="w-14 h-14"/>
+        <div class="text-secondary bg-purple-100 px-4 h-12 flex justify-center items-center rounded-full ml-auto mr-4">
+          🔥 30
+        </div>
+        <button class="w-12 h-12 rounded-lg text-secondary bg-purple-100"><i class="fas fa-sign-out-alt"></i></button>
+      </ul>
+    </nav>
+    
+    <DailyReviewCard class="mt-4" />
+    <!-- Daily lesson section -->
+    <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal">Today's Session</h1> 
+    <DailyLessonCard class="mt-4" />
+    <button class="bg-purple-200 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-4">View previous lessons...</button>
+    <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal">Upcoming Tutorials</h1>
+    <TutorialListElement class="mt-4" />
+    <TutorialListElement class="mt-2" />
+    <TutorialListElement class="mt-2" />
+  </div>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld';
+import DailyReviewCard from './components/DailyReviewCard.vue'
+import DailyLessonCard from './components/DailyLessonCard.vue'
+import TutorialListElement from './components/TutorialListElement.vue'
 
 export default {
   name: 'App',
-
   components: {
-    HelloWorld,
-  },
-
-  data: () => ({
-    //
-  }),
-};
+    DailyReviewCard,
+    DailyLessonCard,
+    TutorialListElement,
+  }
+}
 </script>
+
+<style>
+
+</style>

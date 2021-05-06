@@ -90,5 +90,5 @@ CREATE TABLE learner_lesson (
   CONSTRAINT fk_learner
     FOREIGN KEY (learner) REFERENCES learner(learner_id),
   CONSTRAINT fk_lesson
-    FOREIGN KEY (lesson) REFERENCES flashcard(lesson_id)
+    FOREIGN KEY (lesson) REFERENCES lesson(lesson_id)
 );

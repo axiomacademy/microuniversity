@@ -2,14 +2,16 @@
   <div>
     <div v-if="this.showFiller" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center py-6">
       <img src="../assets/empty.png" class="w-16 h-16" />
-      <h3 class="font-display text-lg text-text font-medium pt-4">No new sessions</h3>
+      <h3 class="font-display text-lg text-text font-medium pt-4">No new lessons</h3>
       <h6 class="font-display text-md text-text">You're done for the day!</h6>
     </div>
     <div v-else class="shadow-sm bg-white rounded-md flex flex-col py-6">
       <h3 class="font-display text-lg font-medium text-text px-6">{{ todayLesson.title }}</h3>
       <span class="font-body text-sm text-gray-400 px-6 pb-4">{{ todayLesson.module }}</span>
       <!-- Image preview -->
-      <div class="w-full h-52 bg-gray-200"></div>
+      <iframe class="w-full h-52" allowFullScreen="allowFullScreen" frameBorder="0"
+        :src="todayLesson.video_link">
+      </iframe>
       <span class="font-body text-sm font-light text-text px-6 pt-4">
         {{ todayLesson.description }}
       </span>
@@ -21,7 +23,7 @@
 </template>
 
 <script>
-import { completeLesson } from '../services/LessonService.js'
+import { completeLesson, getLessonFlashcards } from '../services/LessonService.js'
 
 export default {
   name: 'DailyLessonCard',
@@ -40,9 +42,14 @@ export default {
     },
   },
   methods: {
-    markLessonAsComplete: function () {
-      completeLesson(this.token, this.todayLesson.id)
-      this.empty = true 
+    markLessonAsComplete: async function () {
+      // Get the lesson flashcards
+      await completeLesson(this.token, this.todayLesson.id)
+      
+      let lessonFlashcards = await getLessonFlashcards(this.token, this.todayLesson.id)
+      this.$router.push({ name: 'review', params: { title: 'Lesson Review', reviewCards: lessonFlashcards, done: async function() {
+        return
+      }}}) 
     },
   },
   created: async function () {

@@ -24,7 +24,7 @@
 import FlashCard from '../components/FlashCard.vue'
 
 // services
-import { passFlashcard, failFlashcard, completeReview } from '../services/ReviewService.js'
+import { passFlashcard, failFlashcard } from '../services/ReviewService.js'
 
 export default {
   name: 'App',
@@ -53,38 +53,39 @@ export default {
   created: function() {
     // # Check if the JWT exists
     let token = localStorage.getItem("token")
-    if(token != null) {
-      this.token = token
-
-      // Copy in the param
-      this.cards = this.$route.params.reviewCards
-    } else {
-      console.log("panic")
+    if(token == null) { 
+      this.$router.push({ path: '/login' })
     }
+
+    this.token = token
+    // Copy in the param
+    this.cards = this.$route.params.reviewCards
   },
   methods: {
     goBack: function() {
       this.$router.go(-1)
     },
-    passCard: function() {
-      console.log("passed")
-      passFlashcard(this.token, this.cards[this.index].id) 
+    passCard: async function() {
+      await passFlashcard(this.token, this.cards[this.index].id) 
 
       if(this.index < (this.totalCards - 1)) {
+        this.flippedCard = false
         this.index += 1
       } else {
-        completeReview(this.token)
+        // Done so call the done() callback and exit
+        await this.$route.params.done(this.token)
         this.$router.go(-1) 
       }
     },
-    failCard: function() {
-      console.log("failed")
-      failFlashcard(this.token, this.cards[this.index].id) 
+    failCard: async function() {
+      await failFlashcard(this.token, this.cards[this.index].id) 
       
       if(this.index < (this.totalCards - 1)) {
+        this.flippedCard = false
         this.index += 1
       } else {
-        completeReview(this.token)
+        // Done so call the done() callback and exit
+        await this.$route.params.done(this.token)
         this.$router.go(-1) 
       }
     },

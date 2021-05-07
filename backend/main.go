@@ -194,25 +194,42 @@ func getSelf(w http.ResponseWriter, r *http.Request) {
 
 /*************** LESSON HANDLERS ****************************/
 type lessonResponse struct {
-	Id          string `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	VideoLink   string `json:"video_link"`
-	Module      string `json:"module"`
+	Id            string `json:"id"`
+	Title         string `json:"title"`
+	Description   string `json:"description"`
+	VideoLink     string `json:"video_link"`
+	ScheduledDate string `json:"scheduled_date"`
+	Module        string `json:"module"`
 }
 
 func getLessonToday(w http.ResponseWriter, r *http.Request) {
 
 	learnerId := r.Header.Get("X-User-Claim")
 
+	// Get lesson id from query params
+	// query := r.URL.Query()
+	// lessonId := query.Get("id")
+	timezone := "Asia/Singapore"
+
 	var res lessonResponse
 
+	// Get the current date application is date specific, regardless of timezone they should be shown some lesson at some local date
+	// So take reference to a no timezone date value and compare to their timezone date
+	local := time.Now().UTC()
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	local = local.In(location)
+
 	// All learners have access to the module, because there is only one
-	query := `SELECT lesson_id, title, description, video_link, module from lesson 
-					WHERE scheduled_date = CURRENT_DATE`
+	query := `SELECT lesson_id, title, description, video_link, scheduled_date, module from lesson 
+					WHERE scheduled_date = $1`
 
 	// There should only be one lesson
-	if err := db.QueryRow(query).Scan(&res.Id, &res.Title, &res.Description, &res.VideoLink, &res.Module); err != nil {
+	if err := db.QueryRow(query, local.Format("2006-01-02")).Scan(&res.Id, &res.Title, &res.Description, &res.VideoLink, &res.ScheduledDate, &res.Module); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -221,7 +238,7 @@ func getLessonToday(w http.ResponseWriter, r *http.Request) {
 
 	// Check if lesson is completed
 	query = `SELECT completed FROM learner_lesson WHERE lesson = $1 AND learner = $2`
-	err := db.QueryRow(query, res.Id, learnerId).Scan(&completed)
+	err = db.QueryRow(query, res.Id, learnerId).Scan(&completed)
 
 	if err == sql.ErrNoRows {
 		// No rows returned
@@ -247,8 +264,8 @@ func getLessonsPast(w http.ResponseWriter, r *http.Request) {
 	var res []lessonResponse
 
 	// Selecting all lessons that happened earlier than today
-	sql := `SELECT lesson_id, title, description, video_link, module from lesson 
-					WHERE scheduled_date < CURRENT_DATE`
+	sql := `SELECT lesson_id, title, description, video_link, scheduled_date, module from lesson 
+					WHERE scheduled_date <= CURRENT_DATE`
 
 	result, err := db.Query(sql)
 	if err != nil {
@@ -260,7 +277,7 @@ func getLessonsPast(w http.ResponseWriter, r *http.Request) {
 
 	for result.Next() {
 		var lesson lessonResponse
-		if err := result.Scan(&lesson.Id, &lesson.Title, &lesson.Description, &lesson.VideoLink, &lesson.Module); err != nil {
+		if err := result.Scan(&lesson.Id, &lesson.Title, &lesson.Description, &lesson.VideoLink, &lesson.ScheduledDate, &lesson.Module); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -363,7 +380,7 @@ func getLessonFlashcards(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sql := `SELECT flashcard_id, top_side, bottom_side FROM flashcard WHERE lesson = $1`
+	sql := `SELECT flashcard_id, top_side, bottom_side, lesson FROM flashcard WHERE lesson = $1`
 	result, err := db.Query(sql, lessonId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -449,7 +466,17 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// start and end of day
+	timezone := "Asia/Singapore"
+
 	now := time.Now().UTC()
+	location, err := time.LoadLocation(timezone)
+
+	// Last completed should already be in UTC because of TimezoneTZ
+	if err == nil {
+		now = now.In(location)
+		user.LastCompleted = user.LastCompleted.In(location)
+	}
+
 	d1 := time.Date(user.LastCompleted.Year(), user.LastCompleted.Month(), user.LastCompleted.Day(), 0, 0, 0, 0, user.LastCompleted.Location())
 	d2 := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -613,7 +640,7 @@ func completeReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = stmt.Exec(user.Streak+1, time.Now(), learnerId)
+	_, err = stmt.Exec(user.Streak+1, time.Now().UTC(), learnerId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

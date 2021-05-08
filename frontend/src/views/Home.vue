@@ -1,14 +1,14 @@
 <template>
   <div id="home" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col">
-      <nav class="p-4 border-b border-gray-200">
-        <ul class="flex flex-row items-center">
-          <img src="../assets/logo-transparent-dark.png" class="w-14 h-14"/>
-          <div class="text-secondary bg-purple-100 px-4 h-12 flex justify-center items-center rounded-full ml-auto mr-4">
-            🔥 {{ streak }}
-          </div>
-          <button class="w-12 h-12 rounded-lg text-secondary bg-purple-100"><i class="fas fa-sign-out-alt"></i></button>
-        </ul>
-      </nav>
+    <nav class="p-4 border-b border-gray-200">
+      <ul class="flex flex-row items-center">
+        <img src="../assets/logo-transparent-dark.png" class="w-14 h-14"/>
+        <div class="text-secondary bg-purple-100 px-4 h-12 flex justify-center items-center rounded-full ml-auto mr-4">
+          🔥 {{ streak }}
+        </div>
+        <button @click="logout" class="w-12 h-12 rounded-lg text-secondary bg-purple-100"><i class="fas fa-sign-out-alt"></i></button>
+      </ul>
+    </nav>
       
     <div v-if="!loading">
       <DailyReviewCard :dailyReviewCards="this.dailyReviewCards" class="mt-4" />
@@ -65,7 +65,7 @@ export default {
     // # Check if the JWT exists
     let token = localStorage.getItem("token")
     if(token == null) { 
-      this.$router.push({ path: '/login' })
+      this.$router.push({ name: "login" })
     }
 
     this.token = token
@@ -86,7 +86,12 @@ export default {
 
     this.loading = false
   },
-
+  methods: {
+    logout: function() {
+      localStorage.removeItem("token")
+      this.$router.push({ name: "login" })
+    },
+  },
 }
 </script>
 

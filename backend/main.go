@@ -112,8 +112,15 @@ func loginLearner(w http.ResponseWriter, r *http.Request) {
 	var passwordhash string
 
 	// Get the user associated to the username if it exists
-	sql := `SELECT learner_id, password_hash FROM learner WHERE username = $1`
-	if err := db.QueryRow(sql, req.Username).Scan(&lid, &passwordhash); err != nil {
+	query := `SELECT learner_id, password_hash FROM learner WHERE username = $1`
+	err = db.QueryRow(query, req.Username).Scan(&lid, &passwordhash)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// Password incorrect, throw unauthorized error
+			http.Error(w, "Incorrect username or password", http.StatusUnauthorized)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -138,7 +145,7 @@ func loginLearner(w http.ResponseWriter, r *http.Request) {
 		w.Write(res)
 	} else {
 		// Password incorrect, throw unauthorized error
-		http.Error(w, "Incorrect password", http.StatusUnauthorized)
+		http.Error(w, "Incorrect username or password", http.StatusUnauthorized)
 		return
 	}
 }
@@ -160,6 +167,7 @@ func getSelf(w http.ResponseWriter, r *http.Request) {
 
 	sql := `SELECT learner_id, username, first_name, last_completed, streak FROM learner WHERE learner_id = $1`
 	if err := db.QueryRow(sql, learnerId).Scan(&res.Id, &res.Username, &res.FirstName, &res.LastCompleted, &res.Streak); err != nil {
+		fmt.Println("Hello1")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -169,15 +177,17 @@ func getSelf(w http.ResponseWriter, r *http.Request) {
 	if diff.Hours() > 48 {
 		res.Streak = 0
 		// Reset streak
-		sql = `UPDATE learner SET streak = 0 FROM learner WHERE learner_id = $1`
+		sql = `UPDATE learner SET streak = 0 WHERE learner_id = $1`
 		stmt, err := db.Prepare(sql)
 		if err != nil {
+			fmt.Println("Hello2")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		_, err = stmt.Exec(learnerId)
 		if err != nil {
+			fmt.Println("Hello3")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -229,9 +239,16 @@ func getLessonToday(w http.ResponseWriter, r *http.Request) {
 					WHERE scheduled_date = $1`
 
 	// There should only be one lesson
-	if err := db.QueryRow(query, local.Format("2006-01-02")).Scan(&res.Id, &res.Title, &res.Description, &res.VideoLink, &res.ScheduledDate, &res.Module); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	err = db.QueryRow(query, local.Format("2006-01-02")).Scan(&res.Id, &res.Title, &res.Description, &res.VideoLink, &res.ScheduledDate, &res.Module)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		} else {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	var completed bool

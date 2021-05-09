@@ -76,7 +76,7 @@ CREATE TABLE learner_flashcard (
   flashcard uuid,
   repeat INT DEFAULT 0 NOT NULL,
 
-  PRIMARY KEY (learner, flashcard)
+  PRIMARY KEY (learner, flashcard),
   
   CONSTRAINT fk_learner
     FOREIGN KEY (learner) REFERENCES learner(learner_id),
@@ -89,7 +89,7 @@ CREATE TABLE learner_lesson (
   lesson uuid,
   completed bool,
   
-  PRIMARY KEY (learner, lesson)
+  PRIMARY KEY (learner, lesson),
   
   CONSTRAINT fk_learner
     FOREIGN KEY (learner) REFERENCES learner(learner_id),

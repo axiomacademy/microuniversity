@@ -1,0 +1,48 @@
+version: "3.1"
+services:
+  microuni-frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    labels:
+      - traefik.enable=true
+      - traefik.frontend.rule=Host:beta.axiom.academy
+      - traefik.port=80
+    networks:
+      - web
+      - default
+  microuni-backend:
+    build: ./backend
+    restart: unless-stopped
+    command: sh -c 'sleep 20 && ./main'
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET=${MICROUNI_JWT_SECRET}
+      - DB_URL=${MICROUNI_DB_URL}
+    labels:
+      - traefik.enable=true
+      - "traefik.frontend.rule=Host:beta.axiom.academy;PathPrefix:/api/v1/"
+      - traefik.port=8000
+    networks:
+      - web
+      - default
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    ports:
+      - "5431:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${MICROUNI_POSTGRES_PASSWORD}
+      - POSTGRES_DB=axiom
+    volumes:
+      - ./backend/define.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - default
+
+networks:
+  web:
+    external: true
+

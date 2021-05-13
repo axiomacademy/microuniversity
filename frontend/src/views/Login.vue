@@ -54,6 +54,7 @@ export default {
           localStorage.setItem("token", response.jwt)
           this.$router.push({ name: 'home'})
         } else {
+          console.log("HELLO WORLD")
           this.errorText = "We can't log you in right now. Try again later :("
         }
   
@@ -63,6 +64,7 @@ export default {
           //Unauthorised
           this.errorText = "Invalid username or password! Please try again."
         } else {
+          console.log(err)
           this.errorText = "We can't log you in right now. Try again later :("
         }
 

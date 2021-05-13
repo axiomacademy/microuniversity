@@ -56,6 +56,7 @@ func main() {
 
 	// Unauthenticated endpoints (user management)
 	r.HandleFunc("/api/v1/login", loginLearner).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v1/enrollLearner", enrollModule).Methods("POST", "OPTIONS")
 	// r.HandleFunc("/api/v1/register", registerLearner).Methods("POST", "OPTIONS")
 
 	auth := r.PathPrefix("/api/v1").Subrouter()
@@ -213,6 +214,50 @@ type lessonResponse struct {
 	Completed     bool   `json:"completed"`
 }
 
+func enrollModule(w http.ResponseWriter, r *http.Request) {
+
+	// Get lesson id from query params
+	query := r.URL.Query()
+	module := query.Get("module")
+	learnerId := query.Get("learnerId")
+
+	// Get all of the lessons
+	sql := `SELECT lesson_id, title, description, video_link, scheduled_date, module from lesson 
+					WHERE module = $1`
+
+	result, err := db.Query(sql, module)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer result.Close()
+
+	for result.Next() {
+		var lesson lessonResponse
+		if err := result.Scan(&lesson.Id, &lesson.Title, &lesson.Description, &lesson.VideoLink, &lesson.ScheduledDate, &lesson.Module); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Create the learner_lesson
+		sql = `INSERT INTO learner_lesson(learner, lesson, completed) VALUES ($1, $2, $3)`
+		stmt, err := db.Prepare(sql)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		_, err = stmt.Exec(learnerId, lesson.Id, false)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func getLessonToday(w http.ResponseWriter, r *http.Request) {
 
 	learnerId := r.Header.Get("X-User-Claim")
@@ -279,6 +324,8 @@ func getLessonToday(w http.ResponseWriter, r *http.Request) {
 }
 
 func getLessonsPast(w http.ResponseWriter, r *http.Request) {
+	learnerId := r.Header.Get("X-User-Claim")
+
 	var res []lessonResponse
 
 	// Selecting all lessons that happened earlier than today
@@ -287,7 +334,7 @@ func getLessonsPast(w http.ResponseWriter, r *http.Request) {
 					ON lesson.lesson_id = learner_lesson.lesson AND learner_lesson.learner = $1
 					WHERE scheduled_date <= CURRENT_DATE`
 
-	result, err := db.Query(sql)
+	result, err := db.Query(sql, learnerId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -367,14 +414,14 @@ func completeLesson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update the learner_lesson data
-	sql = `INSERT INTO learner_lesson(learner, lesson, completed) VALUES ($1, $2, $3)`
+	sql = `UPDATE learner_lesson SET completed = true WHERE learner_lesson.learner = $1 AND learner_lesson.lesson = $2`
 	stmt, err = db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_, err = stmt.Exec(learnerId, lessonId, true)
+	_, err = stmt.Exec(learnerId, lessonId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

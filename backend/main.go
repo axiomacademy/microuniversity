@@ -210,6 +210,7 @@ type lessonResponse struct {
 	VideoLink     string `json:"video_link"`
 	ScheduledDate string `json:"scheduled_date"`
 	Module        string `json:"module"`
+	Completed     bool   `json:"completed"`
 }
 
 func getLessonToday(w http.ResponseWriter, r *http.Request) {
@@ -240,6 +241,7 @@ func getLessonToday(w http.ResponseWriter, r *http.Request) {
 
 	// There should only be one lesson
 	err = db.QueryRow(query, local.Format("2006-01-02")).Scan(&res.Id, &res.Title, &res.Description, &res.VideoLink, &res.ScheduledDate, &res.Module)
+	res.Completed = false
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -274,14 +276,15 @@ func getLessonToday(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 }
 
 func getLessonsPast(w http.ResponseWriter, r *http.Request) {
 	var res []lessonResponse
 
 	// Selecting all lessons that happened earlier than today
-	sql := `SELECT lesson_id, title, description, video_link, scheduled_date, module from lesson 
+	sql := `SELECT lesson_id, title, description, video_link, scheduled_date, module, completed from lesson
+					LEFT JOIN learner_lesson
+					ON lesson.lesson_id = learner_lesson.lesson AND learner_lesson.learner = $1
 					WHERE scheduled_date <= CURRENT_DATE`
 
 	result, err := db.Query(sql)
@@ -294,7 +297,7 @@ func getLessonsPast(w http.ResponseWriter, r *http.Request) {
 
 	for result.Next() {
 		var lesson lessonResponse
-		if err := result.Scan(&lesson.Id, &lesson.Title, &lesson.Description, &lesson.VideoLink, &lesson.ScheduledDate, &lesson.Module); err != nil {
+		if err := result.Scan(&lesson.Id, &lesson.Title, &lesson.Description, &lesson.VideoLink, &lesson.ScheduledDate, &lesson.Module, &lesson.Completed); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -385,6 +388,7 @@ type flashcardResponse struct {
 	LessonId   string `json:"lesson_id"`
 }
 
+// You need to ensure that the lesson flashcards exist for the user
 func getLessonFlashcards(w http.ResponseWriter, r *http.Request) {
 
 	var res []flashcardResponse

@@ -1,12 +1,12 @@
 <template>
   <div class="">
-    <div v-if="!flipped" class="shadow-sm p-6 bg-white rounded-md flex justify-center items-center w-full h-full">
+    <div v-if="!flipped" class="shadow-md p-6 bg-white rounded-md flex justify-center items-center w-full h-full">
       <span class="font-display text-2xl text-secondary text-center">
         {{ front }}
       </span>
     </div>
-    <div v-else class="shadow-sm p-6 bg-primary rounded-md flex justify-center items-center w-full h-full">
-      <span class="font-display text-2xl text-white text-center">
+    <div v-else class="shadow-md p-6 bg-primary rounded-md flex justify-center items-center w-full h-full">
+      <span class="font-display text-lg text-white text-center">
         {{ back }}
       </span>
     </div>

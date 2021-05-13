@@ -1,8 +1,8 @@
 <template>
   <div>
     <div v-if="this.showFiller" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center py-6">
-      <img src="../assets/empty.png" class="w-16 h-16" />
-      <h3 class="font-display text-lg text-text font-medium pt-4">No new lessons</h3>
+      <img src="../assets/done.png" class="w-16 h-16" />
+      <h3 class="font-display text-lg text-text font-medium pt-4">No daily lesson</h3>
       <h6 class="font-display text-md text-text">You're done for the day!</h6>
     </div>
     <div v-else class="shadow-sm bg-white rounded-md flex flex-col py-6">

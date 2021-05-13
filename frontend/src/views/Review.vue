@@ -3,7 +3,7 @@
     <nav class="p-4 border-b border-gray-200">
       <ul class="flex flex-row items-center justify-between">
         <h1 class="font-display text-3xl text-secondary font-medium">{{ $route.params.title }}</h1>
-        <button class="w-12 h-12 rounded-lg text-secondary bg-purple-100" @click="goBack"><i class="fas fa-sign-out-alt"></i></button>
+        <button class="w-12 h-12 rounded-lg text-secondary bg-purple-100" @click="goBack"><i class="fas fa-arrow-left"></i></button>
       </ul>
     </nav>
     

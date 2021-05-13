@@ -3,12 +3,17 @@
     <nav class="p-4 border-b border-gray-200 mb-3">
       <ul class="flex flex-row items-center justify-between">
         <h1 class="font-display text-3xl text-secondary font-medium">Lesson History</h1>
-        <button class="w-12 h-12 rounded-lg text-secondary bg-purple-100" @click="goBack"><i class="fas fa-sign-out-alt"></i></button>
+        <button class="w-12 h-12 rounded-lg text-secondary bg-purple-100" @click="goBack"><i class="fas fa-arrow-left"></i></button>
       </ul>
     </nav>
     
     <div v-if="!loading">
-      <div v-for="lesson in lessons" :key="lesson.id" class="shadow-sm bg-white rounded-md flex flex-col py-6 my-3">
+      <div v-if="lessons == null" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center p-6 mt-4">
+        <img src="../assets/empty.png" class="w-24" />
+        <h3 class="font-display text-lg text-text font-medium pt-4">No past lessons</h3>
+        <h6 class="font-display text-sm text-text text-center mt-2">As you finish lessons, they'll appear here in case you want to take a look at them again :)</h6>
+      </div>
+      <div v-else v-for="lesson in lessons" :key="lesson.id" class="shadow-sm bg-white rounded-md flex flex-col py-6 my-3">
         <h3 class="font-display text-lg font-medium text-text px-6">{{ lesson.title }}</h3>
         <span class="font-body text-sm text-gray-400 px-6 pb-4">{{ getFormattedDate(lesson.scheduled_date) }}</span>
         <!-- Image preview -->

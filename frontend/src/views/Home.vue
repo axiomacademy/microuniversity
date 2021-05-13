@@ -19,7 +19,12 @@
       <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal mb-2">Upcoming Tutorials</h1>
 
       <!-- Generating Tutorial List -->
-      <TutorialListElement v-for="tutorial in this.upcomingTutorials" :key="tutorial.id" :title="tutorial.title" :datetime="tutorial.scheduled_time" class="mt-2" />
+      <div v-if="upcomingTutorials == null" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center py-6 mt-4">
+        <img src="../assets/relax.png" class="w-24" />
+        <h3 class="font-display text-lg text-text font-medium pt-4">No upcoming tutorials</h3>
+        <h6 class="font-display text-md text-text">Looks like you can relax for a while!</h6>
+      </div>
+      <TutorialListElement v-else v-for="tutorial in upcomingTutorials" :key="tutorial.id" :title="tutorial.title" :datetime="tutorial.scheduled_time" class="mt-2" />
     </div>
     <div v-else class="flex-grow flex flex-col justify-center items-center">
       <MoonLoader class="self-center" color="#7938D8"/>

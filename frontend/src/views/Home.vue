@@ -85,6 +85,14 @@ export default {
 
     // Get all the upcoming tutorials
     this.upcomingTutorials = await getUpcomingTutorials(this.token)
+    if(this.upcomingTutorials != null) {
+      this.upcomingTutorials.sort((a,b) => {
+        let d1 = new Date(a.scheduled_time)
+        let d2 = new Date(b.scheduled_time)
+
+        return d1 - d2
+      })
+    }
 
     // Get the daily review if there is one
     this.dailyReviewCards = await getDailyReview(this.token)

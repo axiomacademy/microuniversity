@@ -281,8 +281,7 @@ func getLessonToday(w http.ResponseWriter, r *http.Request) {
 	local = local.In(location)
 
 	// All learners have access to the module, because there is only one
-	query := `SELECT lesson_id, title, description, video_link, scheduled_date, module from lesson 
-					WHERE scheduled_date = $1`
+	query := `SELECT lesson_id, title, description, video_link, scheduled_date, module from lesson WHERE scheduled_date = $1`
 
 	// There should only be one lesson
 	err = db.QueryRow(query, local.Format("2006-01-02")).Scan(&res.Id, &res.Title, &res.Description, &res.VideoLink, &res.ScheduledDate, &res.Module)
@@ -303,10 +302,15 @@ func getLessonToday(w http.ResponseWriter, r *http.Request) {
 	// Check if lesson is completed
 	query = `SELECT completed FROM learner_lesson WHERE lesson = $1 AND learner = $2`
 	err = db.QueryRow(query, res.Id, learnerId).Scan(&completed)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-	if err == sql.ErrNoRows {
-		// No rows returned
-		// Marshal to JSON and return
+	if completed == true {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	} else {
 		dres, err := json.Marshal(res)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -314,12 +318,6 @@ func getLessonToday(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Write(dres)
-	} else if err == nil {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	} else {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 }
 

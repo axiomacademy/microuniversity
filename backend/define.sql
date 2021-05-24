@@ -13,7 +13,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- learner table hols the data about the users
 CREATE TABLE learner (
   learner_id uuid DEFAULT uuid_generate_v4 (),
-  username VARCHAR NOT NULL,
+  username VARCHAR UNIQUE NOT NULL,
   password_hash VARCHAR NOT NULL,
   first_name VARCHAR NOT NULL,
   last_completed TIMESTAMPTZ DEFAULT NOW(),

@@ -71,9 +71,7 @@ export default {
     // Get the past lessons
     this.lessons = await getLessonsPast(this.token)
 
-    console.log(this.lessons)
     if(this.lessons != null) {
-      console.log("hello")
       this.lessons.sort((a,b) => {
         let d1 = new Date(a.scheduled_date)
         let d2 = new Date(b.scheduled_date)

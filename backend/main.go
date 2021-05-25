@@ -70,7 +70,7 @@ func main() {
 	// Unauthenticated endpoints (user management)
 	r.HandleFunc("/api/v0.2/enrollLearner", enrollModule).Methods("POST", "OPTIONS")
 
-	r.HandleFunc("/api/v0.2/register", registerLearner).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v0.2/login/email", loginEmail).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v0.2/verifyOtp", verifyOtp).Methods("POST", "OPTIONS")
 
 	auth := r.PathPrefix("/api/v0.2").Subrouter()
@@ -103,7 +103,7 @@ func main() {
 
 /******************* USER MANAGEMENT HANDLERS ****************************/
 
-func registerLearner(w http.ResponseWriter, r *http.Request) {
+func loginEmail(w http.ResponseWriter, r *http.Request) {
 	// Get lesson id from query params
 	query := r.URL.Query()
 	email := query.Get("email")
@@ -127,13 +127,13 @@ func registerLearner(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-type loginResponse struct {
+type verifyResponse struct {
 	Jwt string `json:"jwt"`
 	Id  string `json:"id"`
 }
 
 func verifyOtp(w http.ResponseWriter, r *http.Request) {
-	var response loginResponse
+	var response verifyResponse
 
 	// Get lesson id from query params
 	query := r.URL.Query()

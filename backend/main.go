@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/rand"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -24,22 +25,31 @@ import (
 var DB_URL string
 var JWT_SECRET string
 
-// Global db handler for simplicity
+// Twilio env vars
+var TWILIO_ACCOUNT_SID string
+var TWILIO_AUTH_TOKEN string
+var TWILIO_VERIFY_SID string
+
+// Global handlers for simplicity
 var db *sql.DB
+var twilio *TwilioApi
 
 func main() {
 	fmt.Println("Server initialising...")
 
+	// Getting all the environmental variables
 	DB_URL = os.Getenv("DB_URL")
+	checkEnvVariable(DB_URL)
 	JWT_SECRET = os.Getenv("JWT_SECRET")
+	checkEnvVariable(JWT_SECRET)
 
-	fmt.Println(DB_URL)
-	fmt.Println(JWT_SECRET)
-
-	if DB_URL == "" || JWT_SECRET == "" {
-		log.Panic("The environmental variables DB_URL and JWT_SECRET are not populated")
-		return
-	}
+	// Twilio env vars
+	TWILIO_ACCOUNT_SID = os.Getenv("TWILIO_ACCOUNT_SID")
+	checkEnvVariable(TWILIO_ACCOUNT_SID)
+	TWILIO_AUTH_TOKEN = os.Getenv("TWILIO_AUTH_TOKEN")
+	checkEnvVariable(TWILIO_AUTH_TOKEN)
+	TWILIO_VERIFY_SID = os.Getenv("TWILIO_VERIFY_SID")
+	checkEnvVariable(TWILIO_VERIFY_SID)
 
 	var err error
 	// Initialise the database
@@ -51,15 +61,19 @@ func main() {
 	err = db.Ping()
 	PanicOnError(err)
 
+	// Initialise the twilio client
+	twilio = NewTwilioApi(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SID)
+
 	// Initialise the router
 	r := mux.NewRouter()
 
 	// Unauthenticated endpoints (user management)
-	r.HandleFunc("/api/v1/login", loginLearner).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/v1/enrollLearner", enrollModule).Methods("POST", "OPTIONS")
-	// r.HandleFunc("/api/v1/register", registerLearner).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v0.2/enrollLearner", enrollModule).Methods("POST", "OPTIONS")
 
-	auth := r.PathPrefix("/api/v1").Subrouter()
+	r.HandleFunc("/api/v0.2/login/email", loginEmail).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v0.2/verifyOtp", verifyOtp).Methods("POST", "OPTIONS")
+
+	auth := r.PathPrefix("/api/v0.2").Subrouter()
 
 	// Related to lessons
 	auth.HandleFunc("/lessons/today", getLessonToday).Methods("GET", "OPTIONS")
@@ -88,73 +102,102 @@ func main() {
 }
 
 /******************* USER MANAGEMENT HANDLERS ****************************/
-type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+
+func loginEmail(w http.ResponseWriter, r *http.Request) {
+	// Get lesson id from query params
+	query := r.URL.Query()
+	email := query.Get("email")
+
+	if email == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Check email regex for verification
+	if !isEmailValid(email) {
+		http.Error(w, "Invalid email", http.StatusBadRequest)
+		return
+	}
+
+	err := twilio.StartEmailVerification(email)
+	if err != nil {
+		http.Error(w, "Error starting email verification", http.StatusInternalServerError)
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
-type loginResponse struct {
+type verifyResponse struct {
 	Jwt string `json:"jwt"`
 	Id  string `json:"id"`
 }
 
-func loginLearner(w http.ResponseWriter, r *http.Request) {
-	var req loginRequest
-	var response loginResponse
+func verifyOtp(w http.ResponseWriter, r *http.Request) {
+	var response verifyResponse
 
-	// Decode the request
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	// Get lesson id from query params
+	query := r.URL.Query()
+	code := query.Get("code")
+	email := query.Get("email")
+
+	if code == "" || email == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
 		return
 	}
+
+	// Check email regex for verification
+	if !isEmailValid(email) {
+		http.Error(w, "Invalid email", http.StatusBadRequest)
+		return
+	}
+
+	err := twilio.VerifyCode(code, email)
+	if err == TWILIO_API_ERROR {
+		http.Error(w, "Invalid OTP code", http.StatusUnauthorized)
+	} else if err != nil {
+		http.Error(w, "Error verifying code", http.StatusInternalServerError)
+	}
+
+	// Reaching here means OTP code is valid
 
 	var lid string
-	var passwordhash string
 
-	// Get the user associated to the username if it exists
-	query := `SELECT learner_id, password_hash FROM learner WHERE username = $1`
-	err = db.QueryRow(query, req.Username).Scan(&lid, &passwordhash)
+	// Get the user associated to the email if it exists
+	sqlquery := `SELECT learner_id FROM learner WHERE email = $1`
+	err = db.QueryRow(sqlquery, email).Scan(&lid)
 
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// Password incorrect, throw unauthorized error
-			http.Error(w, "Incorrect username or password", http.StatusUnauthorized)
-			return
-		}
+	if err == sql.ErrNoRows {
+		// Means that the user is new and has to be created
+		sqlquery = `INSERT INTO learner(email) VALUES ($1) RETURNING learner_id`
+		err = db.QueryRow(sqlquery, email).Scan(&lid)
+	} else if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Check if password hashes match then generate JWT
-	if CheckPasswordHash(req.Password, passwordhash) {
-		token, err := createJWT(lid, JWT_SECRET)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		response.Jwt = token
-		response.Id = lid
-
-		res, err := json.Marshal(response)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.Write(res)
-	} else {
-		// Password incorrect, throw unauthorized error
-		http.Error(w, "Incorrect username or password", http.StatusUnauthorized)
+	token, err := createJWT(lid, JWT_SECRET)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	response.Jwt = token
+	response.Id = lid
+
+	res, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(res)
 }
 
 type userResponse struct {
 	Id            string    `json:"id"`
-	Username      string    `json:"username"`
+	Email         string    `json:"email"`
 	FirstName     string    `json:"first_name"`
+	LastName      string    `json:"last_name"`
 	LastCompleted time.Time `json:"last_completed"`
 	Streak        int       `json:"streak"`
 }
@@ -166,9 +209,8 @@ func getSelf(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println(learnerId)
 
-	sql := `SELECT learner_id, username, first_name, last_completed, streak FROM learner WHERE learner_id = $1`
-	if err := db.QueryRow(sql, learnerId).Scan(&res.Id, &res.Username, &res.FirstName, &res.LastCompleted, &res.Streak); err != nil {
-		fmt.Println("Hello1")
+	sql := `SELECT learner_id, email, first_name, last_name, last_completed, streak FROM learner WHERE learner_id = $1`
+	if err := db.QueryRow(sql, learnerId).Scan(&res.Id, &res.Email, &res.FirstName, &res.LastName, &res.LastCompleted, &res.Streak); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -181,14 +223,12 @@ func getSelf(w http.ResponseWriter, r *http.Request) {
 		sql = `UPDATE learner SET streak = 0 WHERE learner_id = $1`
 		stmt, err := db.Prepare(sql)
 		if err != nil {
-			fmt.Println("Hello2")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		_, err = stmt.Exec(learnerId)
 		if err != nil {
-			fmt.Println("Hello3")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -525,8 +565,8 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 	// Retrieve and check last completed
 	var user userResponse
 
-	sql := `SELECT learner_id, username, first_name, last_completed, streak FROM learner WHERE learner_id = $1`
-	if err := db.QueryRow(sql, learnerId).Scan(&user.Id, &user.Username, &user.FirstName, &user.LastCompleted, &user.Streak); err != nil {
+	sql := `SELECT learner_id, email, first_name, last_name, last_completed, streak FROM learner WHERE learner_id = $1`
+	if err := db.QueryRow(sql, learnerId).Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName, &user.LastCompleted, &user.Streak); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -693,8 +733,8 @@ func completeReview(w http.ResponseWriter, r *http.Request) {
 	// Retrieve the learner
 	var user userResponse
 
-	sql := `SELECT learner_id, username, first_name, streak FROM learner WHERE learner_id = $1`
-	if err := db.QueryRow(sql, learnerId).Scan(&user.Id, &user.Username, &user.FirstName, &user.Streak); err != nil {
+	sql := `SELECT learner_id, email, first_name, last_name, streak FROM learner WHERE learner_id = $1`
+	if err := db.QueryRow(sql, learnerId).Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName, &user.Streak); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -806,4 +846,21 @@ func PanicOnError(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func checkEnvVariable(env string) {
+	if env == "" {
+		log.Panic("Some environmental variables are not populated")
+		return
+	}
+}
+
+var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+
+// isEmailValid checks if the email provided passes the required structure and length.
+func isEmailValid(e string) bool {
+	if len(e) < 3 && len(e) > 254 {
+		return false
+	}
+	return emailRegex.MatchString(e)
 }

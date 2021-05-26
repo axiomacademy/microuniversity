@@ -1,33 +1,56 @@
 <template>
   <div id="home" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col">
-    <nav class="p-4 border-b border-gray-200">
+    <!-- Nav bar -->
+    <nav class="p-4 border-b border-purple-200">
       <ul class="flex flex-row items-center">
         <img src="../assets/logo-transparent-dark.png" class="w-14 h-14"/>
         <div class="text-secondary bg-purple-100 px-4 h-12 flex justify-center items-center rounded-full ml-auto mr-4">
           🔥 {{ streak }}
         </div>
-        <button @click="logout" class="w-12 h-12 rounded-lg text-secondary bg-purple-100"><i class="fas fa-sign-out-alt"></i></button>
+        <button @click="logout" class="w-12 h-12 rounded-lg text-secondary bg-purple-100"><i class="fas fa-bars"></i></button>
       </ul>
     </nav>
       
     <div v-if="!loading">
-      <DailyReviewCard :dailyReviewCards="this.dailyReviewCards" class="mt-4" />
-      <!-- Daily lecture section -->
-      <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal">Today's Lecture</h1> 
-      <DailyLectureCard class="mt-4" :todayLecture="this.todayLecture" /> 
-      <button class="bg-purple-200 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-4" @click="$router.push({ name: 'lectures' })">View previous lectures...</button>
-      <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal mb-2">Upcoming Tutorials</h1>
-
-      <!-- Generating Tutorial List -->
-      <div v-if="upcomingTutorials == null" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center py-6 mt-4">
-        <img src="../assets/relax.png" class="w-24" />
-        <h3 class="font-display text-lg text-text font-medium pt-4">No upcoming tutorials</h3>
-        <h6 class="font-display text-md text-text">Looks like you can relax for a while!</h6>
+      <!-- Explore tab with modules, enrolled cohorts etc. -->
+      <div v-id="openTab == 'Explore'" id="explore-tab">
       </div>
-      <TutorialListElement v-else v-for="tutorial in upcomingTutorials" :key="tutorial.id" :title="tutorial.title" :datetime="tutorial.scheduled_time" class="mt-2" />
+
+      <!-- Learning tab with daily review, lessons and tutorials -->
+      <div v-if="openTab == 'Learn'" id="learn-tab">
+        <DailyReviewCard :dailyReviewCards="this.dailyReviewCards" class="mt-4" />
+        <!-- Daily lecture section -->
+        <h1 class="font-display text-2xl text-secondary pl-4 mt-8">Today's Lecture</h1> 
+        <DailyLectureCard class="mt-4" :todayLecture="this.todayLecture" /> 
+        <button class="bg-purple-200 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-4" @click="$router.push({ name: 'lectures' })">View previous lectures...</button>
+        <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal mb-2">Upcoming Tutorials</h1>
+
+        <!-- Generating Tutorial List -->
+        <div v-if="upcomingTutorials == null" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center py-6 mt-4">
+          <img src="../assets/relax.png" class="w-24" />
+          <h3 class="font-display text-lg text-text font-medium pt-4">No upcoming tutorials</h3>
+          <h6 class="font-display text-md text-text">Looks like you can relax for a while!</h6>
+        </div>
+        <TutorialListElement v-else v-for="tutorial in upcomingTutorials" :key="tutorial.id" :title="tutorial.title" :datetime="tutorial.scheduled_time" class="mt-2" />
+      </div>
     </div>
+
+    <!-- LOADING INDICATOR -->
     <div v-else class="flex-grow flex flex-col justify-center items-center">
       <MoonLoader class="self-center" color="#7938D8"/>
+    </div>
+
+    <!-- Floating tab buttons -->
+    <div class="fixed inset-x-0 bottom-0 mb-8 bg-white shadow-lg mx-auto flex w-9/12 h-16 rounded-full justify-around overflow-hidden">
+      <button class="w-6/12 font-display focus:outline-none" @click="openTab = 'Explore'"
+        v-bind:class="{ 'bg-purple-100': exploreTabOpen, 'text-secondary': exploreTabOpen, 'text-text': exploreTabOpen}">
+        🌎 <span class="pl-1" v-bind:class="{ 'font-medium': exploreTabOpen }">Explore</span>
+      </button>
+      <div class="h-full bg-purple-200" style="width: 1px;"></div>
+      <button class="w-6/12 font-display focus:outline-none" @click="openTab = 'Learn'" 
+        v-bind:class="{ 'bg-purple-100': learnTabOpen, 'text-secondary': learnTabOpen, 'text-text': learnTabOpen }">
+        📖 <span class="pl-1" v-bind:class="{ 'font-medium': learnTabOpen }">Learn</span>
+      </button>
     </div>
   </div>
 </template>
@@ -62,7 +85,16 @@ export default {
       todayLecture: null,
       upcomingTutorials: null,
       dailyReviewCards: null,
+      openTab: "Learn",
     }
+  },
+  computed: {
+    learnTabOpen: function () {
+      return this.openTab == "Learn"
+    },
+    exploreTabOpen: function () {
+      return this.openTab == "Explore"
+    },
   },
   created: async function () {
     this.loading = true

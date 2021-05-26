@@ -12,10 +12,10 @@
       
     <div v-if="!loading">
       <DailyReviewCard :dailyReviewCards="this.dailyReviewCards" class="mt-4" />
-      <!-- Daily lesson section -->
-      <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal">Today's Lesson</h1> 
-      <DailyLessonCard class="mt-4" :todayLesson="this.todayLesson" /> 
-      <button class="bg-purple-200 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-4" @click="$router.push({ name: 'lessons' })">View previous lessons...</button>
+      <!-- Daily lecture section -->
+      <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal">Today's Lecture</h1> 
+      <DailyLectureCard class="mt-4" :todayLecture="this.todayLecture" /> 
+      <button class="bg-purple-200 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-4" @click="$router.push({ name: 'lectures' })">View previous lectures...</button>
       <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal mb-2">Upcoming Tutorials</h1>
 
       <!-- Generating Tutorial List -->
@@ -34,14 +34,14 @@
 
 <script>
 import DailyReviewCard from '../components/DailyReviewCard.vue'
-import DailyLessonCard from '../components/DailyLessonCard.vue'
+import DailyLectureCard from '../components/DailyLectureCard.vue'
 import TutorialListElement from '../components/TutorialListElement.vue'
 import { MoonLoader } from '@saeris/vue-spinners'
 
 
 // Services
 import { getSelf } from '../services/LearnerService.js'
-import { getLessonToday } from '../services/LessonService.js'
+import { getLectureToday } from '../services/LectureService.js'
 import { getUpcomingTutorials } from '../services/TutorialService.js'
 import { getDailyReview } from '../services/ReviewService.js'
 
@@ -49,7 +49,7 @@ export default {
   name: 'App',
   components: {
     DailyReviewCard,
-    DailyLessonCard,
+    DailyLectureCard,
     TutorialListElement,
     MoonLoader,
   },
@@ -59,7 +59,7 @@ export default {
       token: "",
       learnerId: "",
       streak: 0,
-      todayLesson: null,
+      todayLecture: null,
       upcomingTutorials: null,
       dailyReviewCards: null,
     }
@@ -80,8 +80,8 @@ export default {
     this.learnerId = self.id
     this.streak = self.streak
 
-    // Get today's lesson if any
-    this.todayLesson = await getLessonToday(this.token)
+    // Get today's lecture if any
+    this.todayLecture = await getLectureToday(this.token)
 
     // Get all the upcoming tutorials
     this.upcomingTutorials = await getUpcomingTutorials(this.token)

@@ -1,7 +1,7 @@
 import { baseUrl } from './HttpService.js'
 
-export async function getLessonToday(token) {
-  const rawResponse = await fetch(`${baseUrl}/lessons/today`, {
+export async function getLectureToday(token) {
+  const rawResponse = await fetch(`${baseUrl}/lectures/today`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -18,8 +18,8 @@ export async function getLessonToday(token) {
   return await rawResponse.json()
 }
 
-export async function getLessonsPast(token) {
-  const rawResponse = await fetch(`${baseUrl}/lessons/past`, {
+export async function getLecturesPast(token) {
+  const rawResponse = await fetch(`${baseUrl}/lectures/past`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -34,8 +34,8 @@ export async function getLessonsPast(token) {
   return await rawResponse.json()
 }
 
-export async function completeLesson(token, lessonId) {
-  const rawResponse = await fetch(`${baseUrl}/lessons/complete?id=${lessonId}`, {
+export async function completeLecture(token, lectureId) {
+  const rawResponse = await fetch(`${baseUrl}/lectures/complete?id=${lectureId}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -47,8 +47,8 @@ export async function completeLesson(token, lessonId) {
   } 
 }
 
-export async function getLessonFlashcards(token, lessonId) {
-  const rawResponse = await fetch(`${baseUrl}/lessons/flashcards?id=${lessonId}`, {
+export async function getLectureFlashcards(token, lectureId) {
+  const rawResponse = await fetch(`${baseUrl}/lectures/flashcards?id=${lectureId}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,

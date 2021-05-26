@@ -318,7 +318,7 @@ func getCohorts(w http.ResponseWriter, r *http.Request) {
 
 	lemail := r.Header.Get("X-User-Claim")
 
-	sqlquery := `SELECT module_id, start_date, status FROM cohort
+	sqlquery := `SELECT module, start_date, status FROM cohort
 	INNER JOIN learner_cohort ON learner_cohort.cohort=cohort.cohort_id AND learner_cohort.learner=$1`
 
 	result, err := db.Query(sqlquery, lemail)
@@ -338,7 +338,7 @@ func getCohorts(w http.ResponseWriter, r *http.Request) {
 
 		// Now retrieve the remaining module data
 		modulequery := `SELECT title, image, description, duration FROM module WHERE module.module_id=$1`
-		if err := db.QueryRow(modulequery, cohort.ModuleId).Scan(&cohort.Title, &cohort.Image, &cohort.Duration); err != nil {
+		if err := db.QueryRow(modulequery, cohort.ModuleId).Scan(&cohort.Title, &cohort.Image, &cohort.Description, &cohort.Duration); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -362,7 +362,7 @@ type cohortData struct {
 	Status             string
 	StartDate          time.Time
 	WeeklyTutorialDay  int
-	WeeklyTutorialTime time.Time
+	WeeklyTutorialTime int
 }
 
 // Relative date is the number of days from the cohort start date
@@ -382,8 +382,16 @@ type tutorialDate struct {
 
 func startCohort(w http.ResponseWriter, r *http.Request) {
 	// First retrieve the cohort
+	query := r.URL.Query()
+	cohortId := query.Get("cohort")
+
+	if cohortId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
 	var cohort cohortData
-	cohort.Id = "somerandom stuff"
+	cohort.Id = cohortId
 
 	cohortQuery := `SELECT module, status, start_date, weekly_tutorial_day, weekly_tutorial_time FROM cohort WHERE cohort_id=$1`
 
@@ -421,6 +429,7 @@ func startCohort(w http.ResponseWriter, r *http.Request) {
 
 	// Weekly Tutorial Day is relative to Monday, being 0 and 6 on Sunday
 	firstTutorialDate := cohort.StartDate.AddDate(0, 0, cohort.WeeklyTutorialDay)
+	firstTutorialDateTime := firstTutorialDate.Add(time.Minute * time.Duration(cohort.WeeklyTutorialTime))
 
 	tutorialQuery := `SELECT tutorial_id, week FROM tutorial WHERE module=$1`
 	result, err = db.Query(tutorialQuery, cohort.Module)
@@ -439,7 +448,7 @@ func startCohort(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Calculate the absolute date
-		tDate.AbsoluteDateTime = firstTutorialDate.AddDate(0, 0, tDate.Week*7)
+		tDate.AbsoluteDateTime = firstTutorialDateTime.AddDate(0, 0, tDate.Week*7)
 		tutorialDates = append(tutorialDates, tDate)
 	}
 
@@ -765,10 +774,12 @@ type tutorialResponse struct {
 func getUpcomingTutorials(w http.ResponseWriter, r *http.Request) {
 	var res []tutorialResponse
 
+	lemail := r.Header.Get("X-User-Claim")
+
 	sql := `SELECT tutorial_id, title, description, scheduled_datetime, module FROM tutorial
 		INNER JOIN learner_tutorial ON learner_tutorial.tutorial=tutorial.tutorial_id AND learner_tutorial.learner=$1
 		WHERE scheduled_datetime > NOW() LIMIT 5`
-	result, err := db.Query(sql)
+	result, err := db.Query(sql, lemail)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

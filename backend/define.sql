@@ -45,7 +45,7 @@ CREATE TABLE cohort (
   status int NOT NULL CHECK (status >= 0 AND status <=2) DEFAULT 0,
   start_date DATE NOT NULL,
   weekly_tutorial_day INT NOT NULL CHECK (weekly_tutorial_day >= 0 AND weekly_tutorial_day <=6),
-  weekly_tutorial_time TIMETZ NOT NULL,
+  weekly_tutorial_time INT NOT NULL CHECK (weekly_tutorial_time >= 0 AND weekly_tutorial_time < 1400),
 
   PRIMARY KEY (cohort_id)
 );

@@ -17,7 +17,7 @@
     <div v-else class="shadow-sm px-10 py-8 bg-white rounded-md flex flex-col justify-center items-start">
       <img src="../assets/mail-sent.png" class="h-20 mb-4 self-center"/>
       <h1 class="font-display text-xl text-text font-medium">Magic link sent!</h1>
-      <h2 class="font-display text-sm text-gray-600 font-regular py-2">We've sent a magic link to <span class="text-primary">{{ email }}</span>. Click it to login and start learning 😎</h2>
+      <h2 class="text-sm text-gray-600 font-regular py-2">We've sent a magic link to <span class="text-primary">{{ email }}</span>. Click it to login and start learning 😎</h2>
 
       <button @click="verificationSent = !verificationSent" class="bg-primary hover:bg-secondary tracking-widest font-body text-xs text-medium text-white uppercase p-2 mt-4 rounded w-full flex flex-row justify-center items-center">
         <BeatLoader :size="8.5" color="#ffffff" v-if="loading" />

@@ -4,11 +4,13 @@ export async function getUpcomingTutorials(token) {
   const rawResponse = await fetch(`${baseUrl}/tutorials`, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `${token}`,
     }
   })
 
-  if(!rawResponse.ok) {
+  if(rawResponse.status == 204) {
+    return []
+  } else if(!rawResponse.ok) {
     throw rawResponse.status
   }
   

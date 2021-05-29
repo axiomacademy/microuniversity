@@ -3,36 +3,32 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"math/rand"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 
+	"context"
 	"fmt"
 	"log"
 	"os"
 
-	"golang.org/x/crypto/bcrypt"
+	firebase "firebase.google.com/go"
+
+	"google.golang.org/api/option"
 )
 
 // Global environmental variables
 var DB_URL string
 var JWT_SECRET string
 
-// Twilio env vars
-var TWILIO_ACCOUNT_SID string
-var TWILIO_AUTH_TOKEN string
-var TWILIO_VERIFY_SID string
-
 // Global handlers for simplicity
 var db *sql.DB
-var twilio *TwilioApi
+
+var fb *firebase.App
 
 func main() {
 	fmt.Println("Server initialising...")
@@ -43,15 +39,12 @@ func main() {
 	JWT_SECRET = os.Getenv("JWT_SECRET")
 	checkEnvVariable(JWT_SECRET)
 
-	// Twilio env vars
-	TWILIO_ACCOUNT_SID = os.Getenv("TWILIO_ACCOUNT_SID")
-	checkEnvVariable(TWILIO_ACCOUNT_SID)
-	TWILIO_AUTH_TOKEN = os.Getenv("TWILIO_AUTH_TOKEN")
-	checkEnvVariable(TWILIO_AUTH_TOKEN)
-	TWILIO_VERIFY_SID = os.Getenv("TWILIO_VERIFY_SID")
-	checkEnvVariable(TWILIO_VERIFY_SID)
-
+	// Loading up firebase
 	var err error
+	opt := option.WithCredentialsFile("./fb-creds.json")
+	fb, err = firebase.NewApp(context.Background(), nil, opt)
+	PanicOnError(err)
+
 	// Initialise the database
 	db, err = sql.Open("postgres", DB_URL)
 	PanicOnError(err)
@@ -61,17 +54,11 @@ func main() {
 	err = db.Ping()
 	PanicOnError(err)
 
-	// Initialise the twilio client
-	twilio = NewTwilioApi(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SID)
-
 	// Initialise the router
 	r := mux.NewRouter()
 
 	// Unauthenticated endpoints (user management)
 	r.HandleFunc("/api/v0.2/cohort/start", startCohort).Methods("POST", "OPTIONS")
-
-	r.HandleFunc("/api/v0.2/login/email", loginEmail).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/v0.2/verifyOtp", verifyOtp).Methods("POST", "OPTIONS")
 
 	// Retrieve all the existing modules
 	r.HandleFunc("/api/v0.2/modules", getModules).Methods("GET", "OPTIONS")
@@ -105,110 +92,6 @@ func main() {
 
 	log.Print("All setup running, and available on port 8000")
 	log.Fatal(http.ListenAndServe(":8000", r))
-}
-
-/******************* USER MANAGEMENT HANDLERS ****************************/
-
-func loginEmail(w http.ResponseWriter, r *http.Request) {
-	// Get lecture id from query params
-	query := r.URL.Query()
-	email := query.Get("email")
-
-	if email == "" {
-		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
-		return
-	}
-
-	// Check email regex for verification
-	if !isEmailValid(email) {
-		http.Error(w, "Invalid email", http.StatusBadRequest)
-		return
-	}
-
-	err := twilio.StartEmailVerification(email)
-	if err != nil {
-		http.Error(w, "Error starting email verification", http.StatusInternalServerError)
-	}
-
-	w.WriteHeader(http.StatusAccepted)
-}
-
-type verifyResponse struct {
-	Jwt   string `json:"jwt"`
-	Email string `json:"email"`
-}
-
-func verifyOtp(w http.ResponseWriter, r *http.Request) {
-	var response verifyResponse
-
-	// Get lecture id from query params
-	query := r.URL.Query()
-	code := query.Get("code")
-	email := query.Get("email")
-
-	if code == "" || email == "" {
-		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
-		return
-	}
-
-	// Check email regex for verification
-	if !isEmailValid(email) {
-		http.Error(w, "Invalid email", http.StatusBadRequest)
-		return
-	}
-
-	err := twilio.VerifyCode(code, email)
-	if err == TWILIO_API_ERROR {
-		http.Error(w, "Invalid OTP code", http.StatusUnauthorized)
-	} else if err != nil {
-		http.Error(w, "Error verifying code", http.StatusInternalServerError)
-	}
-
-	// Reaching here means OTP code is valid
-	var emailRes string
-
-	// Get the user associated to the email if it exists
-	sqlquery := `SELECT email FROM learner WHERE email = $1`
-	err = db.QueryRow(sqlquery, email).Scan(&emailRes)
-
-	if err == sql.ErrNoRows {
-		// Means that the user is new and has to be created
-		sqlquery = `INSERT INTO learner(email) VALUES ($1)`
-
-		stmt, err := db.Prepare(sqlquery)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		_, err = stmt.Exec(email)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Successfully created user go generate JWT
-	} else if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	token, err := createJWT(email, JWT_SECRET)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	response.Jwt = token
-	response.Email = email
-
-	res, err := json.Marshal(response)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Write(res)
 }
 
 type userResponse struct {
@@ -323,6 +206,10 @@ func getCohorts(w http.ResponseWriter, r *http.Request) {
 
 	result, err := db.Query(sqlquery, lemail)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -346,6 +233,10 @@ func getCohorts(w http.ResponseWriter, r *http.Request) {
 		res = append(res, cohort)
 	}
 
+	if len(res) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	// Marshal to JSON and return
 	dres, err := json.Marshal(res)
 	if err != nil {
@@ -615,13 +506,17 @@ func getLecturesPast(w http.ResponseWriter, r *http.Request) {
 	var res []lectureResponse
 
 	// Selecting all lectures that happened earlier than today
-	sql := `SELECT lecture_id, title, description, video_link, scheduled_date, module, completed from lecture
+	sqlquery := `SELECT lecture_id, title, description, video_link, scheduled_date, module, completed from lecture
 					LEFT JOIN learner_lecture
 					ON lecture.lecture_id = learner_lecture.lecture AND learner_lecture.learner = $1
 					WHERE scheduled_date <= CURRENT_DATE`
 
-	result, err := db.Query(sql, lemail)
+	result, err := db.Query(sqlquery, lemail)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -636,6 +531,11 @@ func getLecturesPast(w http.ResponseWriter, r *http.Request) {
 		}
 
 		res = append(res, lecture)
+	}
+
+	if len(res) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
 
 	// Marshal to JSON and return
@@ -776,10 +676,10 @@ func getUpcomingTutorials(w http.ResponseWriter, r *http.Request) {
 
 	lemail := r.Header.Get("X-User-Claim")
 
-	sql := `SELECT tutorial_id, title, description, scheduled_datetime, module FROM tutorial
+	sqlquery := `SELECT tutorial_id, title, description, scheduled_datetime, module FROM tutorial
 		INNER JOIN learner_tutorial ON learner_tutorial.tutorial=tutorial.tutorial_id AND learner_tutorial.learner=$1
 		WHERE scheduled_datetime > NOW() LIMIT 5`
-	result, err := db.Query(sql, lemail)
+	result, err := db.Query(sqlquery, lemail)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -795,6 +695,10 @@ func getUpcomingTutorials(w http.ResponseWriter, r *http.Request) {
 		}
 
 		res = append(res, tutorial)
+	}
+
+	if len(res) == 0 {
+		w.WriteHeader(http.StatusNoContent)
 	}
 
 	// Marshal to JSON and return
@@ -816,8 +720,8 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 	// Retrieve and check last completed
 	var lastCompleted time.Time
 
-	sql := `SELECT last_completed FROM learner WHERE email = $1`
-	if err := db.QueryRow(sql, lemail).Scan(&lastCompleted); err != nil {
+	sqlquery := `SELECT last_completed FROM learner WHERE email = $1`
+	if err := db.QueryRow(sqlquery, lemail).Scan(&lastCompleted); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -846,9 +750,9 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// First retrieve all the repeat due ones
-	sql = `SELECT flashcard_id, top_side, bottom_side, lecture FROM flashcard RIGHT JOIN learner_flashcard ON flashcard.flashcard_id = learner_flashcard.flashcard WHERE learner = $1 AND repeat > 0`
+	sqlquery = `SELECT flashcard_id, top_side, bottom_side, lecture FROM flashcard RIGHT JOIN learner_flashcard ON flashcard.flashcard_id = learner_flashcard.flashcard WHERE learner = $1 AND repeat > 0`
 
-	result, err := db.Query(sql, lemail)
+	result, err := db.Query(sqlquery, lemail)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -867,8 +771,8 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var allFlashcards []flashcardResponse
-	sql = `SELECT flashcard_id, top_side, bottom_side, lecture FROM flashcard RIGHT JOIN learner_flashcard ON flashcard.flashcard_id = learner_flashcard.flashcard WHERE learner = $1 AND repeat = 0`
-	result, err = db.Query(sql, lemail)
+	sqlquery = `SELECT flashcard_id, top_side, bottom_side, lecture FROM flashcard RIGHT JOIN learner_flashcard ON flashcard.flashcard_id = learner_flashcard.flashcard WHERE learner = $1 AND repeat = 0`
+	result, err = db.Query(sqlquery, lemail)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -903,6 +807,11 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 		for _, value := range v {
 			res = append(res, allFlashcards[value])
 		}
+	}
+
+	if len(res) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
 
 	// Marshal to JSON and return
@@ -1029,70 +938,54 @@ func authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		splitToken := strings.Split(reqToken, "Bearer")
-
-		if len(splitToken) != 2 {
-			http.Error(w, "Malformed format for auth token", http.StatusForbidden)
-			return
-		}
-
-		reqToken = strings.TrimSpace(splitToken[1])
-
-		parsedToken, err := jwt.Parse(reqToken, func(token *jwt.Token) (interface{}, error) {
-			// Don't forget to validate the alg is what you expect
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, errors.New("Invalid Signing Type")
-			}
-
-			return []byte(JWT_SECRET), nil
-		})
-
-		// Invalid JWT secret error
+		ctx := context.Background()
+		client, err := fb.Auth(ctx)
 		if err != nil {
-			http.Error(w, "Authentication failed", http.StatusForbidden)
+			http.Error(w, "Error validating auth token", http.StatusInternalServerError)
 			return
 		}
 
-		// Parsing the claims in the JWT token
-		if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok && parsedToken.Valid {
-			// If the claims doesn't include the Id or the UserType, throw an error
-			if claims["email"] == nil {
-				http.Error(w, "Authentication claims failed", http.StatusForbidden)
-				return
-			}
-
-			email := claims["email"].(string)
-
-			r.Header.Set("X-User-Claim", email)
-
-			next.ServeHTTP(w, r)
-		} else {
+		token, err := client.VerifyIDToken(ctx, reqToken)
+		if err != nil {
 			http.Error(w, "Auth token invalid", http.StatusForbidden)
 			return
 		}
+
+		// Valid auth token received check if user exists
+		email := token.Claims["email"].(string)
+
+		// Get the user associated to the email if it exists
+		sqlquery := `SELECT email FROM learner WHERE email = $1`
+		err = db.QueryRow(sqlquery, email).Scan(&email)
+
+		if err == sql.ErrNoRows {
+			// Means that the user is new and has to be created
+			sqlquery = `INSERT INTO learner(email) VALUES ($1)`
+
+			stmt, err := db.Prepare(sqlquery)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			_, err = stmt.Exec(email)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			// Successfully created user go create the Header
+		} else if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		r.Header.Set("X-User-Claim", email)
+		next.ServeHTTP(w, r)
 	})
 }
 
 /********* UTILITIES **************/
-func createJWT(email string, secret string) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"email": email,
-	})
-	tokenString, err := token.SignedString([]byte(secret))
-
-	return tokenString, err
-}
-
-func HashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	return string(bytes), err
-}
-
-func CheckPasswordHash(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
-}
-
 func PanicOnError(err error) {
 	if err != nil {
 		panic(err)

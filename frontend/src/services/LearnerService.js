@@ -4,7 +4,7 @@ export async function getSelf(token) {
   const rawResponse = await fetch(`${baseUrl}/self`, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `${token}`,
     }
   })
  

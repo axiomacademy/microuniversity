@@ -25,12 +25,14 @@
 <script>
 import { completeLecture, getLectureFlashcards } from '../services/LectureService.js'
 
+import firebase from "firebase/app";
+import "firebase/auth";
+
 export default {
   name: 'DailyLectureCard',
   data: function () {
     return {
       token: null,
-      empty: false,
     }
   },
   props: {
@@ -38,7 +40,7 @@ export default {
   },
   computed: {
     showFiller: function () {
-      return (this.todayLecture == null || this.empty )
+      return (this.todayLecture == null )
     },
   },
   methods: {
@@ -53,14 +55,16 @@ export default {
     },
   },
   created: async function () {
-    // # Check if the JWT exists
-    let token = localStorage.getItem("token")
-    if(token != null) {
-      this.token = token    
-    } else {
-      // Route to login page
-      this.$router.push({ path: '/review' })
-    }
+    // Check and retrieve firebase credentials
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        console.log("Logged in")
+        this.token = await user.getIdToken(true) 
+      } else {
+        console.log("Not logged in")
+        this.$router.push({ name: 'login' })
+      }
+    })
   } 
 }
 

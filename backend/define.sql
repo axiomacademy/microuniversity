@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS tutorial CASCADE;
 DROP TABLE IF EXISTS flashcard CASCADE;
 DROP TABLE IF EXISTS learner_flashcard CASCADE;
 DROP TABLE IF EXISTS learner_lecture CASCADE;
+DROP TABLE IF EXISTS learner_tutorial CASCADE;
 
 --UUID support
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -15,8 +16,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- learner table hols the data about the users
 CREATE TABLE learner (
   email VARCHAR UNIQUE NOT NULL,
-  first_name VARCHAR,
-  last_name VARCHAR,
+  first_name VARCHAR DEFAULT '',
+  last_name VARCHAR DEFAULT '',
   last_completed TIMESTAMPTZ DEFAULT NOW(),
   streak INT NOT NULL DEFAULT 0,
 

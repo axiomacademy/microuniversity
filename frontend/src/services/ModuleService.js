@@ -5,7 +5,9 @@ export async function getModules() {
     method: 'GET',
   })
 
-  if(!rawResponse.ok) {
+  if (rawResponse.status == 204) {
+    return []
+  } else if(!rawResponse.ok) {
     throw rawResponse.status
   }
   

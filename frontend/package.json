@@ -11,6 +11,7 @@
     "@saeris/vue-spinners": "^1.0.8",
     "autoprefixer": "^9",
     "core-js": "^3.6.5",
+    "firebase": "^8.6.2",
     "postcss": "^7",
     "tailwindcss": "npm:@tailwindcss/postcss7-compat",
     "vue": "^2.6.11",

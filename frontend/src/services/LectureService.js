@@ -4,7 +4,7 @@ export async function getLectureToday(token) {
   const rawResponse = await fetch(`${baseUrl}/lectures/today`, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `${token}`,
     }
   })
 
@@ -22,11 +22,13 @@ export async function getLecturesPast(token) {
   const rawResponse = await fetch(`${baseUrl}/lectures/past`, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `${token}`,
     }
   })
 
-  if(!rawResponse.ok) {
+  if (rawResponse.status == 204) {
+    return []
+  } else if(!rawResponse.ok) {
     throw rawResponse.status
   }
   
@@ -38,7 +40,7 @@ export async function completeLecture(token, lectureId) {
   const rawResponse = await fetch(`${baseUrl}/lectures/complete?id=${lectureId}`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `${token}`,
     }
   })
 
@@ -51,7 +53,7 @@ export async function getLectureFlashcards(token, lectureId) {
   const rawResponse = await fetch(`${baseUrl}/lectures/flashcards?id=${lectureId}`, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `${token}`,
     }
   })
 

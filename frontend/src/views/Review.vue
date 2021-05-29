@@ -23,6 +23,9 @@
 <script>
 import FlashCard from '../components/FlashCard.vue'
 
+import firebase from "firebase/app";
+import "firebase/auth";
+
 // services
 import { passFlashcard, failFlashcard } from '../services/ReviewService.js'
 
@@ -50,14 +53,15 @@ export default {
       return this.cards[this.index].bottom_side
     },
   },
-  created: function() {
-    // # Check if the JWT exists
-    let token = localStorage.getItem("token")
-    if(token == null) { 
-      this.$router.push({ path: '/login' })
+  created: async function() {
+    // # Check and retrieve firebase credentials
+    let user = await firebase.auth().currentUser;
+ 
+    if(user == null) { 
+      this.$router.push({ name: 'login' })
     }
 
-    this.token = token
+    this.token = await user.getIdToken(true)
     // Copy in the param
     this.cards = this.$route.params.reviewCards
   },

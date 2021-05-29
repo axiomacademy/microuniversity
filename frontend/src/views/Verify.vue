@@ -18,8 +18,8 @@
 
 <script>
 import { MoonLoader } from '@saeris/vue-spinners'
-
-import { verifyOtp } from '../services/LoginService.js'
+import firebase from "firebase/app";
+import "firebase/auth";
 
 export default {
   name: 'Verify',
@@ -33,38 +33,27 @@ export default {
   },
   mounted: async function () {
     console.log("Verify page reached")
-    let code = this.$route.query.code
-    let email = this.$route.query.email
 
-    if((code == "") || (email == "")) {
-      this.errorText = "You clicked an invalid magic link. Try again!"
-      return
-    }
-    
-    if((code == null) || (email == null)) {
-      this.errorText = "You clicked an invalid magic link. Try again!"
-      return
-    }
+    if (firebase.auth().isSignInWithEmailLink(window.location.href)) {
+      let email = window.localStorage.getItem('emailForSignIn');
+      if (!email) {
+        // User opened link on a different device, need access to email
+        email = window.prompt('Please provide your email for confirmation');
+      }
 
-    // Verify the authenticity of the code and get jwt
-    try {
-      let response = await verifyOtp(email, code)
-
-      if (response.jwt != null) {
-          // Set the jwt to the localstorage and route to the home page
-          localStorage.setItem("token", response.jwt)
-          this.$router.push({ name: 'home'})
-        } else {
-          this.errorText = "We can't log you in right now. Try again later :("
-        }
-    } catch (err) {
-      if(err == 401) {
-        //Unauthorised
-        this.errorText = "Invalid OTP. Please try again"
-      } else {
+      try {
+        await firebase.auth().signInWithEmailLink(email, window.location.href)
+        // Clear email from storage.
+        window.localStorage.removeItem('emailForSignIn');
+        this.$router.push({ name: 'home'})
+      } catch (err) {
         console.log(err)
         this.errorText = "We can't log you in right now. Try again later :("
+        return
       }
+    } else {
+      this.errorText = "You clicked an invalid magic link. Try again!"
+      return
     }
   },
 }

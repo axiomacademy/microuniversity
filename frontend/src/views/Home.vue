@@ -1,5 +1,5 @@
 <template>
-  <div id="home" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col pb-32" @click.native="showMenu = false">
+  <div id="home" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col pb-32">
     <!-- Nav bar -->
     <nav class="relative p-4 border-b border-purple-200">
       <ul class="flex flex-row items-center">
@@ -11,8 +11,8 @@
       </ul>
 
       <!-- Hamburder menu -->
-    <div v-if="showMenu" class="absolute bottom-0 right-0 -mb-40 mr-4 bg-purple-100 shadow-sm flex w-8/12 rounded-md overflow-hidden">
-      <ul class="flex flex-col">
+    <div v-if="showMenu" class="absolute bottom-0 right-0 -mb-40 mr-4 bg-purple-100 shadow-sm flex w-8/12 md:w-4/12 rounded-md overflow-hidden">
+      <ul class="flex flex-col w-full">
         <li class="text-sm px-4 py-3 text-text">Signed in as <span class="font-medium">{{ email }}</span></li>
         <div class="bg-purple-200 w-full" style="height: 1px;"></div>
         <button class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200">
@@ -46,7 +46,7 @@
         <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal mb-2">Upcoming Tutorials</h1>
 
         <!-- Generating Tutorial List -->
-        <div v-if="upcomingTutorials == null" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center py-6 mt-4">
+        <div v-if="upcomingTutorials.length == 0" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center py-6 mt-4">
           <img src="../assets/relax.png" class="w-24" />
           <h3 class="font-display text-lg text-text font-medium pt-4">No upcoming tutorials</h3>
           <h6 class="font-display text-md text-text">Looks like you can relax for a while!</h6>
@@ -90,6 +90,9 @@ import { getUpcomingTutorials } from '../services/TutorialService.js'
 import { getDailyReview } from '../services/ReviewService.js'
 import { getModules } from '../services/ModuleService.js'
 
+import firebase from "firebase/app";
+import "firebase/auth";
+
 export default {
   name: 'App',
   components: {
@@ -106,9 +109,9 @@ export default {
       email: "",
       streak: 0,
       todayLecture: null,
-      upcomingTutorials: null,
-      dailyReviewCards: null,
-      modules: null,
+      upcomingTutorials: [],
+      dailyReviewCards: [],
+      modules: [],
       openTab: "Learn",
       showMenu: false,
     }
@@ -122,25 +125,28 @@ export default {
     },
   },
   created: async function () {
-    this.loading = true
-
-    // # Check if the JWT exists
-    let token = localStorage.getItem("token")
-    if(token == null) { 
-      this.$router.push({ name: "login" })
-      return
-    }
-
-    this.token = token
-    
-    // Get all the important data
-    let self = await getSelf(this.token)
-    this.email = self.email
-    this.streak = self.streak
-
-    await this.retrieveLearnerTabData()
-
     this.loading = false
+
+    // Based on observer
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        console.log("Logged in")
+        this.token = await user.getIdToken(true) 
+        
+        // Get all the important data
+        let self = await getSelf(this.token)
+        this.email = self.email
+        this.streak = self.streak
+
+        await this.retrieveLearnerTabData()
+
+        this.loading = false
+      } else {
+        console.log("Not logged in")
+        this.$router.push({ name: 'login' })
+        this.loading = false
+      }
+    })
   },
   methods: {
     retrieveLearnerTabData: async function() {
@@ -149,7 +155,7 @@ export default {
 
       // Get all the upcoming tutorials
       this.upcomingTutorials = await getUpcomingTutorials(this.token)
-      if(this.upcomingTutorials != null) {
+      if(this.upcomingTutorials.length != 0) {
         this.upcomingTutorials.sort((a,b) => {
           let d1 = new Date(a.scheduled_time)
           let d2 = new Date(b.scheduled_time)
@@ -179,8 +185,9 @@ export default {
         return 
       }
     },
-    logout: function() {
-      localStorage.removeItem("token")
+    logout: async function() {
+      this.loading = true
+      await firebase.auth().signOut();
       this.$router.push({ name: "login" })
     },
   },

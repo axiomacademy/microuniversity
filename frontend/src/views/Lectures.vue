@@ -8,7 +8,7 @@
     </nav>
     
     <div v-if="!loading">
-      <div v-if="lectures == null" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center p-6 mt-4">
+      <div v-if="lectures.length == 0" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center p-6 mt-4">
         <img src="../assets/empty.png" class="w-24" />
         <h3 class="font-display text-lg text-text font-medium pt-4">No past lectures</h3>
         <h6 class="font-display text-sm text-text text-center mt-2">As you finish lectures, they'll appear here in case you want to take a look at them again :)</h6>
@@ -41,6 +41,9 @@
 import { MoonLoader } from '@saeris/vue-spinners'
 import { getLecturesPast, getLectureFlashcards, completeLecture } from '../services/LectureService.js'
 
+import firebase from "firebase/app";
+import "firebase/auth";
+
 const options = {
      year: "numeric",
      month:"short",
@@ -61,17 +64,19 @@ export default {
   },
   created: async function () {
     this.loading = true
-    // # Check if the JWT exists
-    let token = localStorage.getItem("token")
-    if(token == null) { 
-      this.$router.push({ path: '/login' })
+    // # Check and retrieve firebase credentials
+    let user = await firebase.auth().currentUser;
+ 
+    if(user == null) { 
+      this.$router.push({ name: 'login' })
     }
-    this.token = token
+
+    this.token = await user.getIdToken(true)
 
     // Get the past lectures
     this.lectures = await getLecturesPast(this.token)
 
-    if(this.lectures != null) {
+    if(this.lectures.length != 0) {
       this.lectures.sort((a,b) => {
         let d1 = new Date(a.scheduled_date)
         let d2 = new Date(b.scheduled_date)

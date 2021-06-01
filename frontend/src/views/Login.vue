@@ -34,8 +34,7 @@
       <h2 class="text-sm text-gray-600 font-regular py-2">We've sent a magic link to <span class="font-semibold">{{ email }}</span>. Click it from this device to login and start learning 😎</h2>
 
       <button @click="verificationSent = !verificationSent" class="bg-primary hover:bg-secondary tracking-widest font-body text-xs text-medium text-white uppercase p-2 mt-4 rounded w-full flex flex-row justify-center items-center">
-        <BeatLoader :size="8.5" color="#ffffff" v-if="loading" />
-        <div v-else>
+        <div>
           Back to login
         </div>
       </button>

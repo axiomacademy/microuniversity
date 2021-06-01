@@ -100,6 +100,7 @@ type userResponse struct {
 	LastName      string    `json:"last_name"`
 	LastCompleted time.Time `json:"last_completed"`
 	Streak        int       `json:"streak"`
+	Timezone      string    `json:"timezone"`
 }
 
 func getSelf(w http.ResponseWriter, r *http.Request) {
@@ -109,8 +110,8 @@ func getSelf(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println(lemail)
 
-	sql := `SELECT email, first_name, last_name, last_completed, streak FROM learner WHERE email = $1`
-	if err := db.QueryRow(sql, lemail).Scan(&res.Email, &res.FirstName, &res.LastName, &res.LastCompleted, &res.Streak); err != nil {
+	sql := `SELECT email, first_name, last_name, last_completed, streak, timezone FROM learner WHERE email = $1`
+	if err := db.QueryRow(sql, lemail).Scan(&res.Email, &res.FirstName, &res.LastName, &res.LastCompleted, &res.Streak, &res.Timezone); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -454,11 +455,7 @@ func enrollModule(w http.ResponseWriter, r *http.Request) {
 func getLectureToday(w http.ResponseWriter, r *http.Request) {
 
 	lemail := r.Header.Get("X-User-Claim")
-
-	// Get lecture id from query params
-	// query := r.URL.Query()
-	// lectureId := query.Get("id")
-	timezone := "Asia/Singapore"
+	timezone := r.Header.Get("X-Timezone-Claim")
 
 	var res lectureResponse
 
@@ -473,7 +470,6 @@ func getLectureToday(w http.ResponseWriter, r *http.Request) {
 
 	local = local.In(location)
 
-	// All learners have access to the module, because there is only one
 	query := `SELECT lecture_id, title, description, video_link, scheduled_date, completed, module from lecture 
 	INNER JOIN learner_lecture ON learner_lecture.lecture=lecture.lecture_id AND learner_lecture.learner=$1 
 	WHERE scheduled_date = $2 AND completed=$3`
@@ -502,16 +498,28 @@ func getLectureToday(w http.ResponseWriter, r *http.Request) {
 
 func getLecturesPast(w http.ResponseWriter, r *http.Request) {
 	lemail := r.Header.Get("X-User-Claim")
+	timezone := r.Header.Get("X-Timezone-Claim")
 
 	var res []lectureResponse
+
+	// Get the current date application is date specific, regardless of timezone they should be shown some lecture at some local date
+	// So take reference to a no timezone date value and compare to their timezone date
+	local := time.Now().UTC()
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	local = local.In(location)
 
 	// Selecting all lectures that happened earlier than today
 	sqlquery := `SELECT lecture_id, title, description, video_link, scheduled_date, module, completed from lecture
 					LEFT JOIN learner_lecture
 					ON lecture.lecture_id = learner_lecture.lecture AND learner_lecture.learner = $1
-					WHERE scheduled_date <= CURRENT_DATE`
+					WHERE scheduled_date <= $2`
 
-	result, err := db.Query(sqlquery, lemail)
+	result, err := db.Query(sqlquery, lemail, local.Format("2006-01-02"))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			w.WriteHeader(http.StatusNoContent)
@@ -719,24 +727,24 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 
 	// Retrieve and check last completed
 	var lastCompleted time.Time
+	var timezoneStr string
 
-	sqlquery := `SELECT last_completed FROM learner WHERE email = $1`
-	if err := db.QueryRow(sqlquery, lemail).Scan(&lastCompleted); err != nil {
+	sqlquery := `SELECT last_completed, timezone FROM learner WHERE email = $1`
+	if err := db.QueryRow(sqlquery, lemail).Scan(&lastCompleted, &timezoneStr); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// start and end of day
-	timezone := "Asia/Singapore"
-
 	now := time.Now().UTC()
-	location, err := time.LoadLocation(timezone)
+	location, err := time.LoadLocation(timezoneStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	// Last completed should already be in UTC because of TimezoneTZ
-	if err == nil {
-		now = now.In(location)
-		lastCompleted = lastCompleted.In(location)
-	}
+	now = now.In(location)
+	lastCompleted = lastCompleted.In(location)
 
 	d1 := time.Date(lastCompleted.Year(), lastCompleted.Month(), lastCompleted.Day(), 0, 0, 0, 0, lastCompleted.Location())
 	d2 := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
@@ -744,15 +752,51 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(d1)
 	fmt.Println(d2)
 
+	// Today's review is already completed
 	if d1.Unix() == d2.Unix() {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
+	// Check for existing scheduled flashcards
+	sqlquery = `SELECT flashcard_id, top_side, bottom_side, lecture FROM flashcard RIGHT JOIN learner_flashcard ON flashcard.flashcard_id = learner_flashcard.flashcard WHERE learner = $1 AND selected = $2`
+
+	result, err := db.Query(sqlquery, lemail, d2)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer result.Close()
+
+	for result.Next() {
+		var flashcard flashcardResponse
+		if err := result.Scan(&flashcard.Id, &flashcard.TopSide, &flashcard.BottomSide, &flashcard.LectureId); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		res = append(res, flashcard)
+	}
+
+	if len(res) != 0 {
+		// Just return the response because we've already scheduled stuff for today
+		// Marshal to JSON and return
+		dres, err := json.Marshal(res)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Write(dres)
+		return
+	}
+
+	// Need to request for the schedule
 	// First retrieve all the repeat due ones
 	sqlquery = `SELECT flashcard_id, top_side, bottom_side, lecture FROM flashcard RIGHT JOIN learner_flashcard ON flashcard.flashcard_id = learner_flashcard.flashcard WHERE learner = $1 AND repeat > 0`
 
-	result, err := db.Query(sqlquery, lemail)
+	result, err = db.Query(sqlquery, lemail)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -810,8 +854,25 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(res) == 0 {
+		// Means there are no flashcards at all, user didn't do any microlectures
 		w.WriteHeader(http.StatusNoContent)
 		return
+	}
+
+	// Update the database to show that these are marked to be done today
+	sqlquery = `UPDATE learner_flashcard SET selected = $1 WHERE learner = $2 AND flashcard = $3`
+	stmt, err := db.Prepare(sqlquery)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, flashcard := range res {
+		_, err = stmt.Exec(d2, lemail, flashcard.Id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Marshal to JSON and return
@@ -845,7 +906,7 @@ func passFlashcard(w http.ResponseWriter, r *http.Request) {
 		repeat -= 1
 	}
 
-	sql = `UPDATE learner_flashcard SET repeat = $1 WHERE learner = $2 AND flashcard = $3`
+	sql = `UPDATE learner_flashcard SET repeat = $1, selected = NULL WHERE learner = $2 AND flashcard = $3`
 	stmt, err := db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -871,7 +932,7 @@ func failFlashcard(w http.ResponseWriter, r *http.Request) {
 	// set repeat to 3 no matter what
 	repeat := 3
 
-	sql := `UPDATE learner_flashcard SET repeat = $1 WHERE learner = $2 AND flashcard = $3`
+	sql := `UPDATE learner_flashcard SET repeat = $1, selected = NULL WHERE learner = $2 AND flashcard = $3`
 	stmt, err := db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -891,22 +952,22 @@ func completeReview(w http.ResponseWriter, r *http.Request) {
 	lemail := r.Header.Get("X-User-Claim")
 
 	// Retrieve the learner
-	var user userResponse
+	var streak int
 
-	sql := `SELECT email, first_name, last_name, streak FROM learner WHERE learner_id = $1`
-	if err := db.QueryRow(sql, lemail).Scan(&user.Email, &user.FirstName, &user.LastName, &user.Streak); err != nil {
+	sql := `SELECT streak FROM learner WHERE email = $1`
+	if err := db.QueryRow(sql, lemail).Scan(&streak); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	sql = `UPDATE learner SET streak = $1, last_completed = $2 WHERE learner_id = $3`
+	sql = `UPDATE learner SET streak = $1, last_completed = $2 WHERE email = $3`
 	stmt, err := db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_, err = stmt.Exec(user.Streak+1, time.Now().UTC(), lemail)
+	_, err = stmt.Exec(streak+1, time.Now().UTC(), lemail)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -953,10 +1014,11 @@ func authMiddleware(next http.Handler) http.Handler {
 
 		// Valid auth token received check if user exists
 		email := token.Claims["email"].(string)
+		var timezone string
 
 		// Get the user associated to the email if it exists
-		sqlquery := `SELECT email FROM learner WHERE email = $1`
-		err = db.QueryRow(sqlquery, email).Scan(&email)
+		sqlquery := `SELECT email, timezone FROM learner WHERE email = $1`
+		err = db.QueryRow(sqlquery, email).Scan(&email, &timezone)
 
 		if err == sql.ErrNoRows {
 			// Means that the user is new and has to be created
@@ -981,6 +1043,7 @@ func authMiddleware(next http.Handler) http.Handler {
 		}
 
 		r.Header.Set("X-User-Claim", email)
+		r.Header.Set("X-Timezone-Claim", timezone)
 		next.ServeHTTP(w, r)
 	})
 }

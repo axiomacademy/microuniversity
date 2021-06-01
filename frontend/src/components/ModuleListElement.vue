@@ -29,10 +29,10 @@ export default {
     readableDuration () {
       if(this.duration < 7) {
         return this.duration + " days"
-      } else if (this.duration < 28) {
+      } else if (this.duration < 30) {
         return this.duration + " days ≈ " + (this.duration/7).toFixed(2) + " weeks"
       } else if (this.duration < 365) {
-        return this.duration + " days ≈ " + (this.duration/28).toFixed(2) + " months"
+        return this.duration + " days ≈ " + (this.duration/30).toFixed(2) + " months"
       } else {
         return this.duration + " days"
       }

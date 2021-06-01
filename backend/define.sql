@@ -20,6 +20,7 @@ CREATE TABLE learner (
   last_name VARCHAR DEFAULT '',
   last_completed TIMESTAMPTZ DEFAULT NOW(),
   streak INT NOT NULL DEFAULT 0,
+  timezone VARCHAR DEFAULT 'Asia/Singapore',
 
   PRIMARY KEY (email)
 );
@@ -134,6 +135,7 @@ CREATE TABLE learner_flashcard (
   learner VARCHAR,
   flashcard uuid,
   repeat INT DEFAULT 0 NOT NULL,
+  selected DATE,
 
   PRIMARY KEY (learner, flashcard),
   

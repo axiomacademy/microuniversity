@@ -125,7 +125,7 @@ export default {
     },
   },
   created: async function () {
-    this.loading = false
+    this.loading = true
 
     // Based on observer
     firebase.auth().onAuthStateChanged(async (user) => {

@@ -10,6 +10,7 @@
   "dependencies": {
     "@saeris/vue-spinners": "^1.0.8",
     "autoprefixer": "^9",
+    "color-hash": "^2.0.1",
     "core-js": "^3.6.5",
     "firebase": "^8.6.2",
     "postcss": "^7",

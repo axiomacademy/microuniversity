@@ -8,7 +8,7 @@
       <input v-model="firstName" type="text" placeholder="First Name" class="bg-gray-100 p-2 w-full rounded font-display border border-transparent focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent mt-4" :disabled="loading">
       <input v-model="lastName" type="text" placeholder="Last Name" class="bg-gray-100 p-2 w-full rounded font-display border border-transparent focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent mt-2" :disabled="loading">
 
-      <div class="mt-4 text-sm text-text">Your detected timezone is <span class="font-normal">{{ timezone }}</span>. The local time here is <span class="font-semibold">{{ currentTime }}</span></div>
+      <div class="mt-4 text-sm text-text">Your detected timezone is <span class="font-bold">{{ timezone }}</span>. The local time here is <span class="text-secondary">{{ currentTime }}</span></div>
       
       <span v-if="errorText != ''" class="text-red-500 my-3 font-body text-xs">{{ errorText }}</span>
 

@@ -18,8 +18,8 @@
         <button class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200">
           My Cohorts
         </button>
-        <button class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200 focus:bg-purple-200">
-          Account Settings
+        <button @click="$router.push({ name: 'profile' })" class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200 focus:bg-purple-200">
+          Profile
         </button>
         <div class="bg-purple-200 w-full" style="height: 1px;"></div>
         <button @click="logout" class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200 focus:bg-purple-200">

@@ -65,27 +65,29 @@ export default {
   created: async function () {
     this.loading = true
     // # Check and retrieve firebase credentials
-    let user = await firebase.auth().currentUser;
- 
-    if(user == null) { 
-      this.$router.push({ name: 'login' })
-    }
+    firebase.auth().onAuthStateChanged(async (user) => {
+      this.loading = true
+      if (user) {
+        this.token = await user.getIdToken(true)
 
-    this.token = await user.getIdToken(true)
+        // Get the past lectures
+        this.lectures = await getLecturesPast(this.token)
 
-    // Get the past lectures
-    this.lectures = await getLecturesPast(this.token)
+        if(this.lectures.length != 0) {
+          this.lectures.sort((a,b) => {
+            let d1 = new Date(a.scheduled_date)
+            let d2 = new Date(b.scheduled_date)
 
-    if(this.lectures.length != 0) {
-      this.lectures.sort((a,b) => {
-        let d1 = new Date(a.scheduled_date)
-        let d2 = new Date(b.scheduled_date)
-
-        return d2 - d1
-      })
-    }
-
-    this.loading = false
+            return d2 - d1
+          })
+          
+        this.loading = false
+        }
+      } else {
+        this.$router.push({ name: 'login' })
+        this.loading = false
+      }
+    })
   },
   methods: {
     goBack: function() {

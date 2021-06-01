@@ -82,6 +82,7 @@ func main() {
 
 	// Get self data
 	auth.HandleFunc("/self", getSelf).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/self", updateSelf).Methods("PUT", "OPTIONS")
 
 	// Get tutorial schedule
 	auth.HandleFunc("/tutorials", getUpcomingTutorials).Methods("GET", "OPTIONS")
@@ -110,8 +111,8 @@ func getSelf(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println(lemail)
 
-	sql := `SELECT email, first_name, last_name, last_completed, streak, timezone FROM learner WHERE email = $1`
-	if err := db.QueryRow(sql, lemail).Scan(&res.Email, &res.FirstName, &res.LastName, &res.LastCompleted, &res.Streak, &res.Timezone); err != nil {
+	sqlquery := `SELECT email, first_name, last_name, last_completed, streak, timezone FROM learner WHERE email = $1`
+	if err := db.QueryRow(sqlquery, lemail).Scan(&res.Email, &res.FirstName, &res.LastName, &res.LastCompleted, &res.Streak, &res.Timezone); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -121,8 +122,8 @@ func getSelf(w http.ResponseWriter, r *http.Request) {
 	if diff.Hours() > 48 {
 		res.Streak = 0
 		// Reset streak
-		sql = `UPDATE learner SET streak = 0 WHERE email = $1`
-		stmt, err := db.Prepare(sql)
+		sqlquery = `UPDATE learner SET streak = 0 WHERE email = $1`
+		stmt, err := db.Prepare(sqlquery)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -142,6 +143,42 @@ func getSelf(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write(dres)
+}
+
+type updateSelfRequest struct {
+	Firstname string `json:"first_name"`
+	Lastname  string `json:"last_name"`
+	Timezone  string `json:"timezone"`
+}
+
+func updateSelf(w http.ResponseWriter, r *http.Request) {
+	lemail := r.Header.Get("X-User-Claim")
+
+	var req updateSelfRequest
+
+	// Parsing request body
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	sqlquery := `UPDATE learner SET first_name = $1, last_name = $2, timezone = $3 WHERE email = $4`
+	stmt, err := db.Prepare(sqlquery)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, err = stmt.Exec(req.Firstname, req.Lastname, req.Timezone, lemail)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 /************** MODULE HANDLERS ******************************/

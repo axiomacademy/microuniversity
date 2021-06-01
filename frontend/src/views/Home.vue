@@ -10,7 +10,7 @@
         <button @click="showMenu = !showMenu" class="w-12 h-12 rounded-lg text-secondary bg-purple-100"><i class="fas fa-bars"></i></button>
       </ul>
 
-      <!-- Hamburder menu -->
+      <!-- Hamburger menu -->
     <div v-if="showMenu" class="absolute bottom-0 right-0 -mb-40 mr-4 bg-purple-100 shadow-sm flex w-8/12 md:w-4/12 rounded-md overflow-hidden">
       <ul class="flex flex-col w-full">
         <li class="text-sm px-4 py-3 text-text">Signed in as <span class="font-medium">{{ email }}</span></li>
@@ -41,7 +41,7 @@
         <DailyReviewCard :dailyReviewCards="this.dailyReviewCards" class="mt-4" />
         <!-- Daily lecture section -->
         <h1 class="font-display text-2xl text-secondary pl-4 mt-8">Today's Lecture</h1> 
-        <DailyLectureCard class="mt-4" :todayLecture="this.todayLecture" /> 
+        <DailyLectureCard class="mt-4" :todayLecture="this.todayLecture" :token="this.token" /> 
         <button class="bg-purple-200 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-4" @click="$router.push({ name: 'lectures' })">View previous lectures...</button>
         <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal mb-2">Upcoming Tutorials</h1>
 
@@ -129,8 +129,8 @@ export default {
 
     // Based on observer
     firebase.auth().onAuthStateChanged(async (user) => {
+      this.loading = true
       if (user) {
-        console.log("Logged in")
         this.token = await user.getIdToken(true) 
         
         // Get all the important data
@@ -142,7 +142,6 @@ export default {
 
         this.loading = false
       } else {
-        console.log("Not logged in")
         this.$router.push({ name: 'login' })
         this.loading = false
       }
@@ -172,14 +171,14 @@ export default {
     },
     setActiveTab: async function(tab) {
       if(tab == "Learn") {
+        this.openTab = "Learn"
         this.loading = true
         await this.retrieveLearnerTabData()
-        this.openTab = "Learn"
         this.loading = false
       } else if (tab == "Explore") {
+        this.openTab = "Explore"
         this.loading = true
         await this.retrieveExploreTabData()
-        this.openTab = "Explore"
         this.loading = false
       } else {
         return 

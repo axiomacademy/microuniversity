@@ -25,18 +25,11 @@
 <script>
 import { completeLecture, getLectureFlashcards } from '../services/LectureService.js'
 
-import firebase from "firebase/app";
-import "firebase/auth";
-
 export default {
   name: 'DailyLectureCard',
-  data: function () {
-    return {
-      token: null,
-    }
-  },
   props: {
     todayLecture: Object,
+    token: String,
   },
   computed: {
     showFiller: function () {
@@ -54,18 +47,6 @@ export default {
       }}}) 
     },
   },
-  created: async function () {
-    // Check and retrieve firebase credentials
-    firebase.auth().onAuthStateChanged(async (user) => {
-      if (user) {
-        console.log("Logged in")
-        this.token = await user.getIdToken(true) 
-      } else {
-        console.log("Not logged in")
-        this.$router.push({ name: 'login' })
-      }
-    })
-  } 
 }
 
 </script>

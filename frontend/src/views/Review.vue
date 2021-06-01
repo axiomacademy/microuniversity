@@ -54,16 +54,16 @@ export default {
     },
   },
   created: async function() {
-    // # Check and retrieve firebase credentials
-    let user = await firebase.auth().currentUser;
- 
-    if(user == null) { 
-      this.$router.push({ name: 'login' })
-    }
-
-    this.token = await user.getIdToken(true)
-    // Copy in the param
     this.cards = this.$route.params.reviewCards
+    
+    // # Check and retrieve firebase credentials
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        this.token = await user.getIdToken(true)
+      } else {
+        this.$router.push({ name: 'login' })
+      }
+    })
   },
   methods: {
     goBack: function() {

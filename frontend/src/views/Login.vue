@@ -4,7 +4,7 @@
       <img src="../assets/logo-transparent-dark.png" class="w-20 h-20 mb-4"/>
       <h1 class="font-display text-3xl text-text font-medium">Login to <span class="text-primary">Axiom</span></h1>
       <h2 class="font-display text-sm text-gray-600 font-regular py-2">Enter your email to get to changing the way you think</h2>
-      <input v-model="email" type="text" placeholder="Email" class="bg-gray-100 p-2 w-full rounded font-display border border-transparent focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent mt-4" :disabled="loading">
+      <input v-model="email" type="text" placeholder="Email" class="bg-gray-100 p-2 w-full rounded font-display border border-transparent focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent mt-4" :disabled="loadingEmail">
       <span v-if="errorText != ''" class="text-red-500 my-3 font-body text-xs">{{ errorText }}</span>
 
       <button @click="loginWithEmail" class="bg-primary hover:bg-secondary tracking-widest font-body text-xs text-medium text-white uppercase p-2 mt-4 rounded w-full flex flex-row justify-center items-center">
@@ -45,6 +45,8 @@
 <script>
 import { BeatLoader } from '@saeris/vue-spinners'
 
+import { getSelf } from '../services/LearnerService'
+
 import firebase from "firebase/app";
 import "firebase/auth";
 
@@ -75,14 +77,11 @@ export default {
   },
   created: async function () {
     // # Check if logged in firebase
-    let user = await firebase.auth().currentUser;
-
-    if(user != null) { 
-      this.$router.push({ name: 'home' })
-    }
-
-    // Set up persistence
-    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) {
+        this.$router.push({ name: 'home' })
+      }
+    })
   },
   methods: {
     loginWithEmail: async function () {
@@ -105,7 +104,17 @@ export default {
       this.loadingGoogle = true
       try {
         await firebase.auth().signInWithPopup(googleProvider) 
-        this.$router.push({ name: 'home'})
+
+        // CHeck if they're a new user
+        let token = await firebase.auth().currentUser.getIdToken(true)
+        console.log(token)
+        let self = await getSelf(token)
+        
+        if (self.first_name == "" || self.last_name == "") {
+          this.$router.push({ name: 'register' })
+        } else {
+          this.$router.push({ name: 'home'})
+        }
       } catch (err) {
         console.log(err)
         this.errorText = "We can't log you in right now. Try again later :("

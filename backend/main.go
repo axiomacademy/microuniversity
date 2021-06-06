@@ -875,7 +875,9 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 	remaining := 20 - len(res)
 	total := len(allFlashcards)
 
-	if remaining >= total {
+	if remaining <= 0 {
+		// do nothing
+	} else if remaining >= total {
 		// just return all the cards
 		for _, card := range allFlashcards {
 			res = append(res, card)

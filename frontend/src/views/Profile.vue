@@ -13,7 +13,7 @@
       <div class="text-text text-lg font-body leading-snug">{{ self.last_name }} </div>
       <div class="text-gray-600 text-md font-body leading-snug">{{ self.timezone }} </div>
       <div class="text-secondary bg-purple-100 px-4 h-10 w-20 mt-4 flex justify-center items-center rounded-full">
-        🔥 {{ streak }}
+        🔥 {{ this.self.streak }}
       </div>
       
       <div class="bg-purple-200 w-full my-4" style="height: 1px;"></div>
@@ -72,7 +72,6 @@ export default {
       newLastName: "",
       newTimezone: "",
       currentTime: "",
-      streak: 40,
       loading: true,
       loadingNameUpdate: false,
       loadingTZUpdate: false,

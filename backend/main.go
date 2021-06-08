@@ -66,7 +66,9 @@ func main() {
 	auth := r.PathPrefix("/api/v0.2").Subrouter()
 
 	// Related to cohorts
-	auth.HandleFunc("/cohorts", getCohorts).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/cohorts", getSelfCohorts).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/cohorts/available", getCohortsForModule).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/cohort/join", joinCohort).Methods("POST", "OPTIONS")
 
 	// Related to lectures
 	auth.HandleFunc("/lectures/today", getLectureToday).Methods("GET", "OPTIONS")
@@ -234,13 +236,13 @@ type cohortResponse struct {
 	Status      int       `json:"completed"`
 }
 
-func getCohorts(w http.ResponseWriter, r *http.Request) {
+func getSelfCohorts(w http.ResponseWriter, r *http.Request) {
 	var res []cohortResponse
 
 	lemail := r.Header.Get("X-User-Claim")
 
 	sqlquery := `SELECT module, start_date, status FROM cohort
-	INNER JOIN learner_cohort ON learner_cohort.cohort=cohort.cohort_id AND learner_cohort.learner=$1`
+	INNER JOIN learner_cohort ON learner_cohort.cohort=cohort.cohort_id AND learner_cohort.learner=$1 AND cohort.status != 0`
 
 	result, err := db.Query(sqlquery, lemail)
 	if err != nil {
@@ -288,7 +290,7 @@ func getCohorts(w http.ResponseWriter, r *http.Request) {
 type cohortData struct {
 	Id                 string
 	Module             string
-	Status             string
+	Status             int
 	StartDate          time.Time
 	WeeklyTutorialDay  int
 	WeeklyTutorialTime int
@@ -307,6 +309,138 @@ type tutorialDate struct {
 	Id               string
 	Week             int
 	AbsoluteDateTime time.Time
+}
+
+type moduleCohortRes struct {
+	Id           string `json:"id"`
+	TutorialDay  int    `json:"tutorial_day"`
+	TutorialTime int    `json:"tutorial_time"`
+	LearnerCount int    `json:"learner_count"`
+}
+
+func getCohortsForModule(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	moduleId := query.Get("module")
+	lemail := r.Header.Get("X-User-Claim")
+
+	if moduleId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	var dummy string
+	// Check if learner is already enrolled in a cohort for the module
+	sqlquery := `SELECT cohort FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id
+								WHERE learner_cohort.learner=$1 AND cohort.module=$2`
+	if err := db.QueryRow(sqlquery, lemail, moduleId).Scan(&dummy); err != sql.ErrNoRows {
+		if err == nil {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	sqlquery = `SELECT cohort_id, weekly_tutorial_day, weekly_tutorial_time, COUNT(learner_cohort.learner) learner_count
+							FROM cohort LEFT JOIN learner_cohort ON learner_cohort.cohort = cohort.cohort_id
+							WHERE cohort.module = $1 AND cohort.status = 0
+							GROUP BY cohort_id, cohort.weekly_tutorial_day, cohort.weekly_tutorial_time`
+
+	var res []moduleCohortRes
+
+	result, err := db.Query(sqlquery, moduleId)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer result.Close()
+
+	for result.Next() {
+		var cohort moduleCohortRes
+		if err := result.Scan(&cohort.Id, &cohort.TutorialDay, &cohort.TutorialTime, &cohort.LearnerCount); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		res = append(res, cohort)
+	}
+
+	// Marshal to JSON and return
+	dres, err := json.Marshal(res)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(dres)
+}
+
+func joinCohort(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	cohortId := query.Get("cohort")
+	lemail := r.Header.Get("X-User-Claim")
+
+	if cohortId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	var cohort cohortData
+	// CHeck that the cohort is open
+	sqlquery := `SELECT cohort_id, weekly_tutorial_time, weekly_tutorial_day, module, status FROM cohort WHERE cohort_id = $1`
+	if err := db.QueryRow(sqlquery, cohortId).Scan(&cohort.Id, &cohort.WeeklyTutorialTime, &cohort.WeeklyTutorialDay, &cohort.Module, &cohort.Status); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if cohort.Status != 0 {
+		http.Error(w, "Invalid cohort id", http.StatusBadRequest)
+		return
+	}
+
+	var dummy string
+	// Check if learner is already enrolled in a cohort for the module
+	sqlquery = `SELECT cohort FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id
+								WHERE learner_cohort.learner=$1 AND cohort.module=$2`
+	if err := db.QueryRow(sqlquery, lemail, cohort.Module).Scan(&dummy); err != sql.ErrNoRows {
+		if err == nil {
+			http.Error(w, "Already enrolled in a cohort for the module", http.StatusBadRequest)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	sqlquery = `INSERT INTO learner_cohort(learner, cohort) VALUES ($1, $2)`
+	if _, err := db.Exec(sqlquery, lemail, cohortId); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var cohortLearnerCount int
+	// Check total count
+	sqlquery = `SELECT COUNT(learner_cohort.learner) learner_count
+							FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id
+							WHERE cohort.cohort_id = $1
+							GROUP BY learner_cohort.cohort`
+	if err := db.QueryRow(sqlquery, cohortId).Scan(&cohortLearnerCount); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Close enrollment into the cohort oonce full
+	if cohortLearnerCount >= 15 {
+		// Close enrollment
+		sqlquery = `UPDATE cohort SET status=1 WHERE cohort_id=$1`
+		if _, err := db.Exec(sqlquery, cohort.Id); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func startCohort(w http.ResponseWriter, r *http.Request) {

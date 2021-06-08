@@ -33,7 +33,7 @@
       <!-- Explore tab with modules, enrolled cohorts etc. -->
       <div v-if="openTab == 'Explore'" id="explore-tab">
         <h1 class="font-display text-2xl text-secondary pl-4 mt-6">🧠 Modules</h1> 
-        <ModuleListElement v-for="module in modules" :key="module.id" :title="module.title" :id="module.id" :description="module.description" :image="module.image" :duration="module.duration"/>
+        <ModuleListElement v-for="module in modules" @click.native="moduleOpen(module)" :key="module.id" :title="module.title" :id="module.id" :description="module.description" :image="module.image" :duration="module.duration"/>
       </div>
 
       <!-- Learning tab with daily review, lessons and tutorials -->
@@ -188,6 +188,9 @@ export default {
       this.loading = true
       await firebase.auth().signOut();
       this.$router.push({ name: "login" })
+    },
+    moduleOpen: function (module) {
+      this.$router.push({name: 'module', params: { module: module }})
     },
   },
 }

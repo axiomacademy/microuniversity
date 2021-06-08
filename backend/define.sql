@@ -40,12 +40,12 @@ CREATE TABLE module (
 -- cohort_start_date is always a Monday
 -- weekly tutorial starts the week before the cohort_start_date with the module orientation session
 -- weekly_tutorial_day starts at 0 for Monday and 6 for Sunday
--- status: 0 = NOT_STARTED, 1 = IN_PROGRESS, 2 = COMPLETED
+-- status: 0 = NOT_STARTED, 1 = ENROLLMENT FULL, 2 = ONGOING, 3 = DONE
 CREATE TABLE cohort (
   cohort_id uuid DEFAULT uuid_generate_v4 (),
   module VARCHAR NOT NULL,
-  status int NOT NULL CHECK (status >= 0 AND status <=2) DEFAULT 0,
-  start_date DATE NOT NULL,
+  status int NOT NULL CHECK (status >= 0 AND status <=3) DEFAULT 0,
+  start_date DATE DEFAULT NULL,
   weekly_tutorial_day INT NOT NULL CHECK (weekly_tutorial_day >= 0 AND weekly_tutorial_day <=6),
   weekly_tutorial_time INT NOT NULL CHECK (weekly_tutorial_time >= 0 AND weekly_tutorial_time < 1400),
 

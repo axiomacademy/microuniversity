@@ -1,23 +1,24 @@
 <template>
-  <div class="flex flex-row pt-4 items-start">
+  <div class="flex flex-row pt-4 items-start cursor-pointer">
     <img class="w-16 h-16 rounded-lg shadow-sm" :src="image" />
     <div class="flex flex-col pl-4">
       <h1 class="font-display text-md font-medium text-text">{{ title }}</h1>
       <h2 class="font-regular text-sm text-purple-400">{{ id }}</h2>
       <h2 class="font-regular text-xs text-text mt-1">{{ description }}</h2>
       <div class="flex flex-row mt-2 items-start">
-        <div class="text-secondary bg-purple-100 px-4 h-8 flex justify-center items-center rounded-full text-xs mr-auto">
-          {{ readableDuration }}
-        </div>
+        <Chip class="mr-auto"> {{ readableDuration }} </Chip>
       </div>
     </div>
-
   </div>
 </template>
 
 <script>
+import Chip from '../components/Chip.vue'
 export default {
   name: 'ModuleListElement',
+  components: {
+    Chip,
+  },
   props: {
     title: String,
     id: String,

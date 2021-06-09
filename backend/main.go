@@ -69,6 +69,8 @@ func main() {
 	auth.HandleFunc("/cohorts", getSelfCohorts).Methods("GET", "OPTIONS")
 	auth.HandleFunc("/cohorts/available", getCohortsForModule).Methods("GET", "OPTIONS")
 	auth.HandleFunc("/cohort/join", joinCohort).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/cohort/self", getModuleCohort).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/cohort/self", leaveModuleCohort).Methods("DELETE", "OPTIONS")
 
 	// Related to lectures
 	auth.HandleFunc("/lectures/today", getLectureToday).Methods("GET", "OPTIONS")
@@ -441,6 +443,76 @@ func joinCohort(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// Checks which cohort you've enrolled in for the module and leaves it
+func leaveModuleCohort(w http.ResponseWriter, r *http.Request) {
+	// First retrieve the cohort
+	lemail := r.Header.Get("X-User-Claim")
+	query := r.URL.Query()
+	moduleId := query.Get("module")
+
+	if moduleId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Check if they're even enrolled in any cohort
+	sqlquery := `SELECT cohort_id, status FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id 
+								WHERE learner_cohort.learner = $1 AND cohort.module = $2`
+
+	var cohortId string
+	var cohortStatus int
+
+	if err := db.QueryRow(sqlquery, lemail, moduleId).Scan(&cohortId, &cohortStatus); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if cohortStatus != 0 {
+		// It's too late to de-enroll
+		http.Error(w, "The cohort has already been finalised", http.StatusBadRequest)
+		return
+	}
+
+	// Else, all is good we cann de-enroll you
+	sqlquery = `DELETE FROM learner_cohort WHERE learner = $1 AND cohort = $1`
+	if _, err := db.Exec(sqlquery, lemail, cohortId); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func getModuleCohort(w http.ResponseWriter, r *http.Request) {
+	// First retrieve the cohort
+	lemail := r.Header.Get("X-User-Claim")
+	query := r.URL.Query()
+	moduleId := query.Get("module")
+
+	if moduleId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Check if they're even enrolled in any cohort
+	sqlquery := `SELECT cohort_id, module, status, start_date, weekly_tutorial_day, weekly_tutorial_time FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id WHERE learner_cohort.learner = $1 AND cohort.module = $2`
+
+	var res cohortData
+
+	if err := db.QueryRow(sqlquery, lemail, moduleId).Scan(&res.Id, &res.Module, &res.Status, &res.StartDate, &res.WeeklyTutorialDay, &res.WeeklyTutorialTime); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	dres, err := json.Marshal(res)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(dres)
 }
 
 func startCohort(w http.ResponseWriter, r *http.Request) {

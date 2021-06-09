@@ -1,5 +1,5 @@
 <template>
-  <div id="review" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col justify-start">
+  <div id="review" class="wrapper bg-purple-50 h-screen p-4 flex flex-col justify-start">
     <nav class="p-4 border-b border-purple-200">
       <ul class="flex flex-row items-center justify-between">
         <h1 class="font-display text-3xl text-secondary font-medium">{{ $route.params.title }}</h1>

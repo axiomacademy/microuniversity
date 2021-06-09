@@ -15,7 +15,7 @@
     <h1 class="font-display text-2xl text-secondary font-medium px-4">Available Cohorts</h1>
 
     <div v-if="showAvailability && !loading" class="w-full px-4">
-      <h2 class="font-regular text-xs text-text font-light mt-1 mb-4">Every Axiom module comes with a weekly hour-long tutorial session. Pick the timeslots you are comfortable with and we'll enroll you in a cohort that works for you! You can select multiple.</h2>
+      <h2 class="font-regular text-xs text-text font-light mt-1 mb-4">Every Axiom module comes with a weekly hour-long tutorial session. Pick the timeslot you are comfortable with and we'll enroll you in a cohort that works for you!</h2>
       <div class="flex flex-row justify-start items-center mt-2">
         <Chip class="mr-1" :focused="showDay == 0" @click.native="showDay = 0"> Friday </Chip>
         <Chip class="mx-1" :focused="showDay == 1" @click.native="showDay = 1"> Saturday </Chip>

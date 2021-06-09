@@ -15,8 +15,8 @@
       <ul class="flex flex-col w-full">
         <li class="text-sm px-4 py-3 text-text">Signed in as <span class="font-medium">{{ email }}</span></li>
         <div class="bg-purple-200 w-full" style="height: 1px;"></div>
-        <button class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200">
-          My Cohorts
+        <button @click="$router.push({name: 'modules'});"  class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200">
+          My Modules
         </button>
         <button @click="$router.push({ name: 'profile' })" class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200 focus:bg-purple-200">
           Profile
@@ -32,7 +32,7 @@
     <div v-if="!loading">
       <!-- Explore tab with modules, enrolled cohorts etc. -->
       <div v-if="openTab == 'Explore'" id="explore-tab">
-        <h1 class="font-display text-2xl text-secondary pl-4 mt-6">🧠 Modules</h1> 
+        <h1 class="font-display text-2xl text-secondary pl-4 mt-6">Explore Modules 🧠</h1> 
         <ModuleListElement v-for="module in modules" @click.native="moduleOpen(module)" :key="module.id" :title="module.title" :id="module.id" :description="module.description" :image="module.image" :duration="module.duration"/>
       </div>
 

@@ -45,7 +45,7 @@ CREATE TABLE cohort (
   cohort_id uuid DEFAULT uuid_generate_v4 (),
   module VARCHAR NOT NULL,
   status int NOT NULL CHECK (status >= 0 AND status <=3) DEFAULT 0,
-  start_date DATE DEFAULT NULL,
+  start_date DATE NOT NULL DEFAULT NOW(),
   weekly_tutorial_day INT NOT NULL CHECK (weekly_tutorial_day >= 0 AND weekly_tutorial_day <=6),
   weekly_tutorial_time INT NOT NULL CHECK (weekly_tutorial_time >= 0 AND weekly_tutorial_time < 1400),
 

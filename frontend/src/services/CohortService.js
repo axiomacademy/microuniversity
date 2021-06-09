@@ -8,7 +8,9 @@ export async function getSelfCohorts(token) {
     }
   })
  
-  if(!rawResponse.ok) {
+  if(rawResponse.status == 204) {
+    return null
+  } else if(!rawResponse.ok) {
     throw rawResponse.status
   }
 
@@ -38,9 +40,40 @@ export async function getAvailableCohorts(token, moduleId) {
   }
 }
 
+// Your applied/accepted cohort for a module
+export async function getModuleCohort(token, moduleId) {
+  const rawResponse = await fetch(`${baseUrl}/cohort/self?module=${moduleId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `${token}`,
+    }
+  })
+
+  if(rawResponse.status == 204) {
+    return null
+  } else if(!rawResponse.ok) {
+    throw rawResponse.status
+  }
+
+  return await rawResponse.json()
+}
+
 export async function joinCohort(token, cohortId) {
   const rawResponse = await fetch(`${baseUrl}/cohort/join?cohort=${cohortId}`, {
     method: 'POST',
+    headers: {
+      'Authorization': `${token}`,
+    }
+  })
+ 
+  if(!rawResponse.ok) {
+    throw rawResponse.status
+  }
+}
+
+export async function leaveModuleCohort(token, moduleId) {
+  const rawResponse = await fetch(`${baseUrl}/cohort/leave?module=${moduleId}`, {
+    method: 'DELETE',
     headers: {
       'Authorization': `${token}`,
     }

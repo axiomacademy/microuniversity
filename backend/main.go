@@ -70,7 +70,7 @@ func main() {
 	auth.HandleFunc("/cohorts/available", getCohortsForModule).Methods("GET", "OPTIONS")
 	auth.HandleFunc("/cohort/join", joinCohort).Methods("POST", "OPTIONS")
 	auth.HandleFunc("/cohort/self", getModuleCohort).Methods("GET", "OPTIONS")
-	auth.HandleFunc("/cohort/self", leaveModuleCohort).Methods("DELETE", "OPTIONS")
+	auth.HandleFunc("/cohort/leave", leaveModuleCohort).Methods("DELETE", "OPTIONS")
 
 	// Related to lectures
 	auth.HandleFunc("/lectures/today", getLectureToday).Methods("GET", "OPTIONS")
@@ -229,13 +229,13 @@ func getModules(w http.ResponseWriter, r *http.Request) {
 
 /*************** COHORT HANDLERS ***************************/
 type cohortResponse struct {
-	ModuleId    string    `json:"module_id"`
-	Title       string    `json:"module_title"`
-	Image       string    `json:"module_image"`
-	Description string    `json:"module_description"`
+	ModuleId    string    `json:"id"`
+	Title       string    `json:"title"`
+	Image       string    `json:"image"`
+	Description string    `json:"description"`
 	StartDate   time.Time `json:"start_date"`
 	Duration    int       `json:"duration"`
-	Status      int       `json:"completed"`
+	Status      int       `json:"status"`
 }
 
 func getSelfCohorts(w http.ResponseWriter, r *http.Request) {
@@ -244,7 +244,7 @@ func getSelfCohorts(w http.ResponseWriter, r *http.Request) {
 	lemail := r.Header.Get("X-User-Claim")
 
 	sqlquery := `SELECT module, start_date, status FROM cohort
-	INNER JOIN learner_cohort ON learner_cohort.cohort=cohort.cohort_id AND learner_cohort.learner=$1 AND cohort.status != 0`
+	INNER JOIN learner_cohort ON learner_cohort.cohort=cohort.cohort_id AND learner_cohort.learner=$1`
 
 	result, err := db.Query(sqlquery, lemail)
 	if err != nil {
@@ -476,13 +476,23 @@ func leaveModuleCohort(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Else, all is good we cann de-enroll you
-	sqlquery = `DELETE FROM learner_cohort WHERE learner = $1 AND cohort = $1`
+	sqlquery = `DELETE FROM learner_cohort WHERE learner = $1 AND cohort = $2`
 	if _, err := db.Exec(sqlquery, lemail, cohortId); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+type getModuleCohortRes struct {
+	Id                 string    `json:"id"`
+	Module             string    `json:"module"`
+	Status             int       `json:"status"`
+	StartDate          time.Time `json:"start_date"`
+	WeeklyTutorialDay  int       `json:"tutorial_day"`
+	WeeklyTutorialTime int       `json:"tutorial_time"`
+	LearnerCount       int       `json:"learner_count"`
 }
 
 func getModuleCohort(w http.ResponseWriter, r *http.Request) {
@@ -499,9 +509,25 @@ func getModuleCohort(w http.ResponseWriter, r *http.Request) {
 	// Check if they're even enrolled in any cohort
 	sqlquery := `SELECT cohort_id, module, status, start_date, weekly_tutorial_day, weekly_tutorial_time FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id WHERE learner_cohort.learner = $1 AND cohort.module = $2`
 
-	var res cohortData
+	var res getModuleCohortRes
 
 	if err := db.QueryRow(sqlquery, lemail, moduleId).Scan(&res.Id, &res.Module, &res.Status, &res.StartDate, &res.WeeklyTutorialDay, &res.WeeklyTutorialTime); err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Get the count
+	sqlquery = `SELECT COUNT(learner_cohort.learner) learner_count
+							FROM cohort LEFT JOIN learner_cohort ON learner_cohort.cohort = cohort.cohort_id
+							WHERE cohort_id = $1
+							GROUP BY cohort_id, cohort.weekly_tutorial_day, cohort.weekly_tutorial_time`
+
+	if err := db.QueryRow(sqlquery, res.Id).Scan(&res.LearnerCount); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

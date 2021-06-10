@@ -1,7 +1,7 @@
 import { baseUrl } from './HttpService.js'
 
-export async function getUpcomingTutorials(token) {
-  const rawResponse = await fetch(`${baseUrl}/tutorials`, {
+export async function getUpcomingTutorials(token, moduleId) {
+  const rawResponse = await fetch(`${baseUrl}/tutorials?module=${moduleId}`, {
     method: 'GET',
     headers: {
       'Authorization': `${token}`,

@@ -42,7 +42,7 @@
         <!-- Daily lecture section -->
         <h1 class="font-display text-2xl text-secondary pl-4 mt-8">Today's Lecture</h1> 
         <DailyLectureCard class="mt-4" :todayLecture="this.todayLecture" :token="this.token" /> 
-        <button class="bg-purple-200 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-4" @click="$router.push({ name: 'lectures' })">View previous lectures...</button>
+        <button class="bg-purple-200 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-4" @click="activeLecturesOpen()">View previous lectures...</button>
         <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal mb-2">Upcoming Tutorials</h1>
 
         <!-- Generating Tutorial List -->
@@ -85,6 +85,7 @@ import { MoonLoader } from '@saeris/vue-spinners'
 
 // Services
 import { getSelf } from '../services/LearnerService.js'
+import { getSelfActiveCohort } from '../services/CohortService.js'
 import { getLectureToday } from '../services/LectureService.js'
 import { getUpcomingTutorials } from '../services/TutorialService.js'
 import { getDailyReview } from '../services/ReviewService.js'
@@ -114,6 +115,7 @@ export default {
       modules: [],
       openTab: "Learn",
       showMenu: false,
+      existingCohort: {},
     }
   },
   computed: {
@@ -137,7 +139,9 @@ export default {
         let self = await getSelf(this.token)
         this.email = self.email
         this.streak = self.streak
-
+        
+        // Check if they are already enrolled in a cohort for this module
+        this.existingCohort = await getSelfActiveCohort(this.token)
         await this.retrieveLearnerTabData()
 
         this.loading = false
@@ -149,18 +153,23 @@ export default {
   },
   methods: {
     retrieveLearnerTabData: async function() {
-      // Get today's lecture if any
-      this.todayLecture = await getLectureToday(this.token)
+      if (this.existingCohort != null) {
+        // Get today's lecture if any
+        this.todayLecture = await getLectureToday(this.token)
 
-      // Get all the upcoming tutorials
-      this.upcomingTutorials = await getUpcomingTutorials(this.token)
-      if(this.upcomingTutorials.length != 0) {
-        this.upcomingTutorials.sort((a,b) => {
-          let d1 = new Date(a.scheduled_time)
-          let d2 = new Date(b.scheduled_time)
+        // Get all the upcoming tutorials
+        this.upcomingTutorials = await getUpcomingTutorials(this.token, this.existingCohort.module)
+        if(this.upcomingTutorials.length != 0) {
+          this.upcomingTutorials.sort((a,b) => {
+            let d1 = new Date(a.scheduled_time)
+            let d2 = new Date(b.scheduled_time)
 
-          return d1 - d2
-        })
+            return d1 - d2
+          })
+        }
+      } else {
+        this.todayLecture = null
+        this.upcomingTutorials = []
       }
 
       // Get the daily review if there is one
@@ -191,6 +200,9 @@ export default {
     },
     moduleOpen: function (module) {
       this.$router.push({name: 'module', params: { module: module }})
+    },
+    activeLecturesOpen() {
+      this.$router.push({ name: 'lectures', params: { module: this.existingCohort.module }})
     },
   },
 }

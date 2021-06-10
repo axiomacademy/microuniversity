@@ -18,8 +18,8 @@ export async function getLectureToday(token) {
   return await rawResponse.json()
 }
 
-export async function getLecturesPast(token) {
-  const rawResponse = await fetch(`${baseUrl}/lectures/past`, {
+export async function getLecturesPast(token, moduleId) {
+  const rawResponse = await fetch(`${baseUrl}/lectures/past?module=${moduleId}`, {
     method: 'GET',
     headers: {
       'Authorization': `${token}`,

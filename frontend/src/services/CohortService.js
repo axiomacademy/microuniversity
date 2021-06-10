@@ -41,8 +41,8 @@ export async function getAvailableCohorts(token, moduleId) {
 }
 
 // Your applied/accepted cohort for a module
-export async function getModuleCohort(token, moduleId) {
-  const rawResponse = await fetch(`${baseUrl}/cohort/self?module=${moduleId}`, {
+export async function getSelfActiveCohort(token) {
+  const rawResponse = await fetch(`${baseUrl}/cohort/self`, {
     method: 'GET',
     headers: {
       'Authorization': `${token}`,

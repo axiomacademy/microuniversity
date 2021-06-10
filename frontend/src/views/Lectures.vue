@@ -71,7 +71,7 @@ export default {
         this.token = await user.getIdToken(true)
 
         // Get the past lectures
-        this.lectures = await getLecturesPast(this.token)
+        this.lectures = await getLecturesPast(this.token, this.$route.params.module)
 
         if(this.lectures.length != 0) {
           this.lectures.sort((a,b) => {
@@ -79,10 +79,10 @@ export default {
             let d2 = new Date(b.scheduled_date)
 
             return d2 - d1
-          })
-          
-        this.loading = false
+          })  
         }
+
+        this.loading = false
       } else {
         this.$router.push({ name: 'login' })
         this.loading = false

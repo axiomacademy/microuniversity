@@ -498,20 +498,13 @@ type getModuleCohortRes struct {
 func getModuleCohort(w http.ResponseWriter, r *http.Request) {
 	// First retrieve the cohort
 	lemail := r.Header.Get("X-User-Claim")
-	query := r.URL.Query()
-	moduleId := query.Get("module")
 
-	if moduleId == "" {
-		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
-		return
-	}
-
-	// Check if they're even enrolled in any cohort
-	sqlquery := `SELECT cohort_id, module, status, start_date, weekly_tutorial_day, weekly_tutorial_time FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id WHERE learner_cohort.learner = $1 AND cohort.module = $2`
+	// Check if they're even enrolled in any cohort should only be one cohort
+	sqlquery := `SELECT cohort_id, module, status, start_date, weekly_tutorial_day, weekly_tutorial_time FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id WHERE learner_cohort.learner = $1`
 
 	var res getModuleCohortRes
 
-	if err := db.QueryRow(sqlquery, lemail, moduleId).Scan(&res.Id, &res.Module, &res.Status, &res.StartDate, &res.WeeklyTutorialDay, &res.WeeklyTutorialTime); err != nil {
+	if err := db.QueryRow(sqlquery, lemail).Scan(&res.Id, &res.Module, &res.Status, &res.StartDate, &res.WeeklyTutorialDay, &res.WeeklyTutorialTime); err != nil {
 		if err == sql.ErrNoRows {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -769,6 +762,14 @@ func getLecturesPast(w http.ResponseWriter, r *http.Request) {
 	lemail := r.Header.Get("X-User-Claim")
 	timezone := r.Header.Get("X-Timezone-Claim")
 
+	query := r.URL.Query()
+	moduleId := query.Get("module")
+
+	if moduleId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
 	var res []lectureResponse
 
 	// Get the current date application is date specific, regardless of timezone they should be shown some lecture at some local date
@@ -786,9 +787,9 @@ func getLecturesPast(w http.ResponseWriter, r *http.Request) {
 	sqlquery := `SELECT lecture_id, title, description, video_link, scheduled_date, module, completed from lecture
 					LEFT JOIN learner_lecture
 					ON lecture.lecture_id = learner_lecture.lecture AND learner_lecture.learner = $1
-					WHERE scheduled_date <= $2`
+					WHERE scheduled_date <= $2 AND module = $3`
 
-	result, err := db.Query(sqlquery, lemail, local.Format("2006-01-02"))
+	result, err := db.Query(sqlquery, lemail, local.Format("2006-01-02"), moduleId)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			w.WriteHeader(http.StatusNoContent)
@@ -953,10 +954,17 @@ func getUpcomingTutorials(w http.ResponseWriter, r *http.Request) {
 
 	lemail := r.Header.Get("X-User-Claim")
 
+	query := r.URL.Query()
+	moduleId := query.Get("module")
+	if moduleId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
 	sqlquery := `SELECT tutorial_id, title, description, scheduled_datetime, module FROM tutorial
 		INNER JOIN learner_tutorial ON learner_tutorial.tutorial=tutorial.tutorial_id AND learner_tutorial.learner=$1
-		WHERE scheduled_datetime > NOW() LIMIT 5`
-	result, err := db.Query(sqlquery, lemail)
+		WHERE scheduled_datetime > NOW() AND module = $2 LIMIT 5`
+	result, err := db.Query(sqlquery, lemail, moduleId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

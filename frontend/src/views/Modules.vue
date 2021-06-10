@@ -8,15 +8,15 @@
     </nav>
     
     <div v-if="!loading">
-      <h1 class="font-display text-2xl text-secondary pl-4 mt-4">Current Modules 📅</h1>
+      <h1 class="font-display text-2xl text-secondary pl-4 mt-4">Active Module 📅</h1>
       <ModuleListElement v-for="module in getCurrentModules" @click.native="moduleOpen(module)" :key="module.id" :title="module.title" :id="module.id" :description="module.description" :image="module.image" :duration="module.duration"/>
-      <div v-if="getCurrentModules.length == 0" class="bg-purple-200 font-display font-light text-secondary py-2 px-6 rounded flex mt-4 mx-4">No ongoing modules. Find something new to start learning today!</div>
+      <div v-if="getCurrentModules.length == 0" class="bg-purple-200 font-display font-light text-sm text-secondary py-2 px-6 rounded flex mt-4 mx-4">No ongoing modules. Find something new to start learning today!</div>
   
       <div class="w-full self-center bg-purple-200 my-8" style="height: 1px;"></div>
 
       <h1 class="font-display text-2xl text-secondary pl-4">Completed Modules ✅</h1>
       <ModuleListElement v-for="module in getCompletedModules" @click.native="moduleOpen(module)" :key="module.id" :title="module.title" :id="module.id" :description="module.description" :image="module.image" :duration="module.duration"/>
-      <div v-if="getCompletedModules.length == 0" class="bg-purple-200 font-display font-light text-secondary py-2 px-6 rounded flex mt-4 mx-4">No completed modules!</div>
+      <div v-if="getCompletedModules.length == 0" class="bg-purple-200 font-display font-light text-sm text-secondary py-2 px-6 rounded flex mt-4 mx-4">No completed modules!</div>
     </div>
 
     <div v-else class="flex-grow flex flex-col justify-center items-center">

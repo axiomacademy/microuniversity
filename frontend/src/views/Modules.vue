@@ -1,13 +1,13 @@
 <template> 
-  <div id="modules" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col pb-32">
-    <nav class="p-4 border-b border-purple-200 mb-3">
+  <div id="modules" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col pb-32 items-center">
+    <nav class="p-4 border-b border-purple-200 mb-3 w-full lg:w-6/12">
       <ul class="flex flex-row items-center justify-between">
         <h1 class="font-display text-3xl text-secondary font-medium">My Modules</h1>
         <button class="w-12 h-12 rounded-lg text-secondary bg-purple-100" @click="goBack"><i class="fas fa-arrow-left"></i></button>
       </ul>
     </nav>
     
-    <div v-if="!loading">
+    <div v-if="!loading" class="w-full lg:w-6/12">
       <h1 class="font-display text-2xl text-secondary pl-4 mt-4">Active Module 📅</h1>
       <ModuleListElement v-for="module in getCurrentModules" @click.native="moduleOpen(module)" :key="module.id" :title="module.title" :id="module.id" :description="module.description" :image="module.image" :duration="module.duration"/>
       <div v-if="getCurrentModules.length == 0" class="bg-purple-200 font-display font-light text-sm text-secondary py-2 px-6 rounded flex mt-4 mx-4">No ongoing modules. Find something new to start learning today!</div>

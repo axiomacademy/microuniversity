@@ -1,13 +1,13 @@
 <template>
-  <div id="profile" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col justify-start">
-    <nav class="p-4 border-b border-purple-200 mb-3">
+  <div id="profile" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col justify-start items-center">
+    <nav class="p-4 border-b border-purple-200 mb-3 w-full lg:w-6/12">
       <ul class="flex flex-row items-center justify-between">
         <h1 class="font-display text-3xl text-secondary font-medium">Edit Profile</h1>
         <button @click="$router.go(-1)" class="w-12 h-12 rounded-lg text-secondary bg-purple-100"><i class="fas fa-arrow-left"></i></button>
       </ul>
     </nav>
 
-    <div v-if="loading != true" class="m-4">
+    <div v-if="loading != true" class="m-4 w-full lg:w-6/12">
       <div class="w-20 h-20 rounded-lg flex justify-center items-center text-white text-3xl tracking-widest uppercase" :style="profileHash">{{ self.first_name[0] + self.last_name[0] }}</div>
       <div class="text-text text-lg font-body pt-4 font-semibold leading-snug">{{ self.first_name }} </div>
       <div class="text-text text-lg font-body leading-snug">{{ self.last_name }} </div>

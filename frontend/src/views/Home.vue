@@ -1,7 +1,7 @@
 <template>
-  <div id="home" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col pb-32">
+  <div id="home" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col pb-32 items-center">
     <!-- Nav bar -->
-    <nav class="relative p-4 border-b border-purple-200">
+    <nav class="relative p-4 border-b border-purple-200 lg:w-6/12 w-full">
       <ul class="flex flex-row items-center">
         <img src="../assets/logo-transparent-dark.png" class="w-14 h-14"/>
         <div class="text-secondary bg-purple-100 px-4 h-12 flex justify-center items-center rounded-full ml-auto mr-4">
@@ -29,7 +29,7 @@
     </div>
     </nav>
       
-    <div v-if="!loading">
+    <div v-if="!loading" class="lg:w-6/12 w-full">
       <!-- Explore tab with modules, enrolled cohorts etc. -->
       <div v-if="openTab == 'Explore'" id="explore-tab">
         <h1 class="font-display text-2xl text-secondary pl-4 mt-6">Explore Modules 🧠</h1> 
@@ -61,7 +61,7 @@
     </div>
 
     <!-- Floating tab buttons -->
-    <div class="fixed inset-x-0 bottom-0 mb-8 bg-white shadow-lg mx-auto flex w-9/12 h-16 rounded-full justify-around overflow-hidden">
+    <div class="fixed inset-x-0 bottom-0 mb-8 bg-white shadow-lg mx-auto flex w-9/12 lg:w-4/12 h-16 rounded-full justify-around overflow-hidden">
       <button class="w-6/12 font-display focus:outline-none" @click="setActiveTab('Explore')"
         v-bind:class="{ 'bg-purple-100': exploreTabOpen, 'text-secondary': exploreTabOpen, 'text-text': exploreTabOpen}">
         🌎 <span class="pl-1" v-bind:class="{ 'font-medium': exploreTabOpen }">Explore</span>

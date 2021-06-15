@@ -1,15 +1,16 @@
 <template>
-  <div id="module" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col justify-start">
-  <nav class="p-4 border-b border-purple-200">
+  <div id="module" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col justify-start items-center">
+  <nav class="p-4 border-b border-purple-200 lg:w-6/12 w-full">
     <ul class="flex flex-row items-center justify-between">
       <img class="w-12 h-12 rounded-lg shadow-sm" :src="module.image" />
       <h1 class="font-display text-xl text-secondary font-medium">{{ module.id }}</h1>
       <button class="w-12 h-12 rounded-lg text-secondary bg-purple-100" @click="$router.go(-1)"><i class="fas fa-arrow-left"></i></button>
     </ul>
   </nav>
+
+  <div class="w-full lg:w-6/12">
   <h1 class="font-display text-2xl text-secondary font-medium px-4 mt-6">{{ module.title }}</h1>
   <h2 class="font-regular text-sm text-text mt-2 px-4">{{ module.description }}</h2>
-
   <div class="w-full self-center bg-purple-200 my-6" style="height: 1px;"></div>
 
     <div class="w-full" v-if="enrolled">
@@ -80,6 +81,7 @@
     <div v-if="loading" class="flex-grow flex flex-col justify-start items-center mt-8">
       <MoonLoader class="self-center" color="#7938D8"/>
     </div>
+  </div>
   </div> 
 </template>
 

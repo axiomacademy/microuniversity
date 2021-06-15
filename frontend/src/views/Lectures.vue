@@ -1,13 +1,13 @@
 <template>
-  <div id="lectures" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col justify-start">
-    <nav class="p-4 border-b border-purple-200 mb-3">
+  <div id="lectures" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col justify-start items-center">
+    <nav class="p-4 border-b border-purple-200 mb-3 lg:w-6/12 w-full">
       <ul class="flex flex-row items-center justify-between">
         <h1 class="font-display text-3xl text-secondary font-medium">Lecture History</h1>
         <button class="w-12 h-12 rounded-lg text-secondary bg-purple-100" @click="goBack"><i class="fas fa-arrow-left"></i></button>
       </ul>
     </nav>
     
-    <div v-if="!loading">
+    <div v-if="!loading" class="w-full lg:w-6/12">
       <div v-if="lectures.length == 0" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center p-6 mt-4">
         <img src="../assets/empty.png" class="w-24" />
         <h3 class="font-display text-lg text-text font-medium pt-4">No past lectures</h3>

@@ -1,8 +1,8 @@
 <template>
   <div id="more-info" class="bg-purple-50 min-h-screen p-4 flex flex-col justify-center items-center">
-    <div class="shadow-sm px-8 py-8 bg-white rounded-md flex flex-col justify-center items-start lg:w-4/12">
-      <img src="../assets/welcome.png" class="w-25"/>
-      <h1 class="font-display text-3xl text-text font-medium">Hello there!</h1>
+    <div class="shadow-sm px-8 py-8 bg-white rounded-md flex flex-col justify-center items-start w-full md:w-6/12 lg:w-4/12">
+      <img src="../assets/welcome.png" class="w-full"/>
+      <h1 class="font-display text-3xl text-text font-medium mt-4">Hello there!</h1>
       <h2 class="font-display text-sm text-gray-600 font-regular py-2">We're glad to have you join the Axiom community. To finish creating your account, we need a bit more information about you.
       </h2>
       <input v-model="firstName" type="text" placeholder="First Name" class="bg-gray-100 p-2 w-full rounded font-display border border-transparent focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent mt-4" :disabled="loading">

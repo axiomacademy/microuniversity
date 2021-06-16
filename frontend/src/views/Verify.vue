@@ -18,6 +18,7 @@
 
 <script>
 import { MoonLoader } from '@saeris/vue-spinners'
+import { getSelf } from '../services/LearnerService'
 import firebase from "firebase/app";
 import "firebase/auth";
 
@@ -45,7 +46,17 @@ export default {
         await firebase.auth().signInWithEmailLink(email, window.location.href)
         // Clear email from storage.
         window.localStorage.removeItem('emailForSignIn');
-        this.$router.push({ name: 'home'})
+        
+        // CHeck if they're a new user
+        let token = await firebase.auth().currentUser.getIdToken(true)
+        console.log(token)
+        let self = await getSelf(token)
+        
+        if (self.first_name == "" || self.last_name == "") {
+          this.$router.push({ name: 'register' })
+        } else {
+          this.$router.push({ name: 'home'})
+        }
       } catch (err) {
         console.log(err)
         this.errorText = "We can't log you in right now. Try again later :("

@@ -137,6 +137,12 @@ export default {
         
         // Get all the important data
         let self = await getSelf(this.token)
+
+        // Check if everything is correct
+        if (self.first_name == "" || self.last_name == "") {
+          this.$router.push({ name: 'register' })
+        }
+
         this.email = self.email
         this.streak = self.streak
         

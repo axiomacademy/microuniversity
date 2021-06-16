@@ -4,12 +4,12 @@ export async function getDailyReview(token) {
   const rawResponse = await fetch(`${baseUrl}/review`, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `${token}`,
     }
   }) 
   
   if(rawResponse.status == 204) {
-    return null
+    return []
   } else if(!rawResponse.ok) {
     throw rawResponse.status
   }
@@ -22,7 +22,7 @@ export async function passFlashcard(token, flashcardId) {
   const rawResponse = await fetch(`${baseUrl}/flashcard/pass?id=${flashcardId}`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `${token}`,
     }
   }) 
   
@@ -35,7 +35,7 @@ export async function failFlashcard(token, flashcardId) {
   const rawResponse = await fetch(`${baseUrl}/flashcard/fail?id=${flashcardId}`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `${token}`,
     }
   }) 
   
@@ -48,7 +48,7 @@ export async function completeReview(token) {
   const rawResponse = await fetch(`${baseUrl}/review/complete`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `${token}`,
     }
   }) 
   

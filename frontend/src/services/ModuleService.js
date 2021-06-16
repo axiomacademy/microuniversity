@@ -1,14 +1,11 @@
 import { baseUrl } from './HttpService.js'
-
-export async function getUpcomingTutorials(token, moduleId) {
-  const rawResponse = await fetch(`${baseUrl}/tutorials?module=${moduleId}`, {
+ 
+export async function getModules() {
+  const rawResponse = await fetch(`${baseUrl}/modules`, {
     method: 'GET',
-    headers: {
-      'Authorization': `${token}`,
-    }
   })
 
-  if(rawResponse.status == 204) {
+  if (rawResponse.status == 204) {
     return []
   } else if(!rawResponse.ok) {
     throw rawResponse.status

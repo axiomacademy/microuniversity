@@ -14,7 +14,6 @@
 
 <script>
 const optionsTime = {
-   timeZone:"Asia/Singapore",
    hour12 : true,
    hour:  "numeric",
    minute: "numeric",seconds:"numeric"

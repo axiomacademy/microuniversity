@@ -3,45 +3,48 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"math/rand"
 	"net/http"
-	"strings"
+	"regexp"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 
+	"context"
 	"fmt"
 	"log"
 	"os"
 
-	"golang.org/x/crypto/bcrypt"
+	firebase "firebase.google.com/go"
+
+	"google.golang.org/api/option"
 )
 
 // Global environmental variables
 var DB_URL string
 var JWT_SECRET string
 
-// Global db handler for simplicity
+// Global handlers for simplicity
 var db *sql.DB
+
+var fb *firebase.App
 
 func main() {
 	fmt.Println("Server initialising...")
 
+	// Getting all the environmental variables
 	DB_URL = os.Getenv("DB_URL")
+	checkEnvVariable(DB_URL)
 	JWT_SECRET = os.Getenv("JWT_SECRET")
+	checkEnvVariable(JWT_SECRET)
 
-	fmt.Println(DB_URL)
-	fmt.Println(JWT_SECRET)
-
-	if DB_URL == "" || JWT_SECRET == "" {
-		log.Panic("The environmental variables DB_URL and JWT_SECRET are not populated")
-		return
-	}
-
+	// Loading up firebase
 	var err error
+	opt := option.WithCredentialsFile("./fb-creds.json")
+	fb, err = firebase.NewApp(context.Background(), nil, opt)
+	PanicOnError(err)
+
 	// Initialise the database
 	db, err = sql.Open("postgres", DB_URL)
 	PanicOnError(err)
@@ -55,17 +58,25 @@ func main() {
 	r := mux.NewRouter()
 
 	// Unauthenticated endpoints (user management)
-	r.HandleFunc("/api/v1/login", loginLearner).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/v1/enrollLearner", enrollModule).Methods("POST", "OPTIONS")
-	// r.HandleFunc("/api/v1/register", registerLearner).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v0.2/cohort/start", startCohort).Methods("POST", "OPTIONS")
 
-	auth := r.PathPrefix("/api/v1").Subrouter()
+	// Retrieve all the existing modules
+	r.HandleFunc("/api/v0.2/modules", getModules).Methods("GET", "OPTIONS")
 
-	// Related to lessons
-	auth.HandleFunc("/lessons/today", getLessonToday).Methods("GET", "OPTIONS")
-	auth.HandleFunc("/lessons/past", getLessonsPast).Methods("GET", "OPTIONS")
-	auth.HandleFunc("/lessons/complete", completeLesson).Methods("POST", "OPTIONS")
-	auth.HandleFunc("/lessons/flashcards", getLessonFlashcards).Methods("GET", "OPTIONS")
+	auth := r.PathPrefix("/api/v0.2").Subrouter()
+
+	// Related to cohorts
+	auth.HandleFunc("/cohorts", getSelfCohorts).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/cohorts/available", getCohortsForModule).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/cohort/join", joinCohort).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/cohort/self", getModuleCohort).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/cohort/leave", leaveModuleCohort).Methods("DELETE", "OPTIONS")
+
+	// Related to lectures
+	auth.HandleFunc("/lectures/today", getLectureToday).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/lectures/past", getLecturesPast).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/lectures/complete", completeLecture).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/lectures/flashcards", getLectureFlashcards).Methods("GET", "OPTIONS")
 
 	// Related to daily review
 	auth.HandleFunc("/review", getDailyReview).Methods("GET", "OPTIONS")
@@ -75,6 +86,7 @@ func main() {
 
 	// Get self data
 	auth.HandleFunc("/self", getSelf).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/self", updateSelf).Methods("PUT", "OPTIONS")
 
 	// Get tutorial schedule
 	auth.HandleFunc("/tutorials", getUpcomingTutorials).Methods("GET", "OPTIONS")
@@ -87,88 +99,24 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8000", r))
 }
 
-/******************* USER MANAGEMENT HANDLERS ****************************/
-type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-type loginResponse struct {
-	Jwt string `json:"jwt"`
-	Id  string `json:"id"`
-}
-
-func loginLearner(w http.ResponseWriter, r *http.Request) {
-	var req loginRequest
-	var response loginResponse
-
-	// Decode the request
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	var lid string
-	var passwordhash string
-
-	// Get the user associated to the username if it exists
-	query := `SELECT learner_id, password_hash FROM learner WHERE username = $1`
-	err = db.QueryRow(query, req.Username).Scan(&lid, &passwordhash)
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// Password incorrect, throw unauthorized error
-			http.Error(w, "Incorrect username or password", http.StatusUnauthorized)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Check if password hashes match then generate JWT
-	if CheckPasswordHash(req.Password, passwordhash) {
-		token, err := createJWT(lid, JWT_SECRET)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		response.Jwt = token
-		response.Id = lid
-
-		res, err := json.Marshal(response)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.Write(res)
-	} else {
-		// Password incorrect, throw unauthorized error
-		http.Error(w, "Incorrect username or password", http.StatusUnauthorized)
-		return
-	}
-}
-
 type userResponse struct {
-	Id            string    `json:"id"`
-	Username      string    `json:"username"`
+	Email         string    `json:"email"`
 	FirstName     string    `json:"first_name"`
+	LastName      string    `json:"last_name"`
 	LastCompleted time.Time `json:"last_completed"`
 	Streak        int       `json:"streak"`
+	Timezone      string    `json:"timezone"`
 }
 
 func getSelf(w http.ResponseWriter, r *http.Request) {
-	learnerId := r.Header.Get("X-User-Claim")
+	lemail := r.Header.Get("X-User-Claim")
 
 	var res userResponse
 
-	fmt.Println(learnerId)
+	fmt.Println(lemail)
 
-	sql := `SELECT learner_id, username, first_name, last_completed, streak FROM learner WHERE learner_id = $1`
-	if err := db.QueryRow(sql, learnerId).Scan(&res.Id, &res.Username, &res.FirstName, &res.LastCompleted, &res.Streak); err != nil {
-		fmt.Println("Hello1")
+	sqlquery := `SELECT email, first_name, last_name, last_completed, streak, timezone FROM learner WHERE email = $1`
+	if err := db.QueryRow(sqlquery, lemail).Scan(&res.Email, &res.FirstName, &res.LastName, &res.LastCompleted, &res.Streak, &res.Timezone); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -178,17 +126,15 @@ func getSelf(w http.ResponseWriter, r *http.Request) {
 	if diff.Hours() > 48 {
 		res.Streak = 0
 		// Reset streak
-		sql = `UPDATE learner SET streak = 0 WHERE learner_id = $1`
-		stmt, err := db.Prepare(sql)
+		sqlquery = `UPDATE learner SET streak = 0 WHERE email = $1`
+		stmt, err := db.Prepare(sqlquery)
 		if err != nil {
-			fmt.Println("Hello2")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		_, err = stmt.Exec(learnerId)
+		_, err = stmt.Exec(lemail)
 		if err != nil {
-			fmt.Println("Hello3")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -203,8 +149,518 @@ func getSelf(w http.ResponseWriter, r *http.Request) {
 	w.Write(dres)
 }
 
-/*************** LESSON HANDLERS ****************************/
-type lessonResponse struct {
+type updateSelfRequest struct {
+	Firstname string `json:"first_name"`
+	Lastname  string `json:"last_name"`
+	Timezone  string `json:"timezone"`
+}
+
+func updateSelf(w http.ResponseWriter, r *http.Request) {
+	lemail := r.Header.Get("X-User-Claim")
+
+	var req updateSelfRequest
+
+	// Parsing request body
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	sqlquery := `UPDATE learner SET first_name = $1, last_name = $2, timezone = $3 WHERE email = $4`
+	stmt, err := db.Prepare(sqlquery)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, err = stmt.Exec(req.Firstname, req.Lastname, req.Timezone, lemail)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
+/************** MODULE HANDLERS ******************************/
+type moduleResponse struct {
+	Id          string `json:"id"`
+	Title       string `json:"title"`
+	Image       string `json:"image"`
+	Description string `json:"description"`
+	Duration    int    `json:"duration"`
+}
+
+func getModules(w http.ResponseWriter, r *http.Request) {
+	var res []moduleResponse
+
+	sqlquery := `SELECT module_id, title, image, description, duration FROM module`
+
+	result, err := db.Query(sqlquery)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer result.Close()
+
+	for result.Next() {
+		var module moduleResponse
+		if err := result.Scan(&module.Id, &module.Title, &module.Image, &module.Description, &module.Duration); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		res = append(res, module)
+	}
+
+	// Marshal to JSON and return
+	dres, err := json.Marshal(res)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(dres)
+}
+
+/*************** COHORT HANDLERS ***************************/
+type cohortResponse struct {
+	ModuleId    string    `json:"id"`
+	Title       string    `json:"title"`
+	Image       string    `json:"image"`
+	Description string    `json:"description"`
+	StartDate   time.Time `json:"start_date"`
+	Duration    int       `json:"duration"`
+	Status      int       `json:"status"`
+}
+
+func getSelfCohorts(w http.ResponseWriter, r *http.Request) {
+	var res []cohortResponse
+
+	lemail := r.Header.Get("X-User-Claim")
+
+	sqlquery := `SELECT module, start_date, status FROM cohort
+	INNER JOIN learner_cohort ON learner_cohort.cohort=cohort.cohort_id AND learner_cohort.learner=$1`
+
+	result, err := db.Query(sqlquery, lemail)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer result.Close()
+
+	for result.Next() {
+		var cohort cohortResponse
+		if err := result.Scan(&cohort.ModuleId, &cohort.StartDate, &cohort.Status); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Now retrieve the remaining module data
+		modulequery := `SELECT title, image, description, duration FROM module WHERE module.module_id=$1`
+		if err := db.QueryRow(modulequery, cohort.ModuleId).Scan(&cohort.Title, &cohort.Image, &cohort.Description, &cohort.Duration); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		res = append(res, cohort)
+	}
+
+	if len(res) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	// Marshal to JSON and return
+	dres, err := json.Marshal(res)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(dres)
+}
+
+type cohortData struct {
+	Id                 string
+	Module             string
+	Status             int
+	StartDate          time.Time
+	WeeklyTutorialDay  int
+	WeeklyTutorialTime int
+}
+
+// Relative date is the number of days from the cohort start date
+type lectureDate struct {
+	Id           string
+	RelativeDate int
+	AbsoluteDate time.Time
+}
+
+// Week is which week the tutorial is on relative to the start date
+// Week 0 is the first week
+type tutorialDate struct {
+	Id               string
+	Week             int
+	AbsoluteDateTime time.Time
+}
+
+type moduleCohortRes struct {
+	Id           string `json:"id"`
+	TutorialDay  int    `json:"tutorial_day"`
+	TutorialTime int    `json:"tutorial_time"`
+	LearnerCount int    `json:"learner_count"`
+}
+
+func getCohortsForModule(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	moduleId := query.Get("module")
+	lemail := r.Header.Get("X-User-Claim")
+
+	if moduleId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	var dummy string
+	// Check if learner is already enrolled in a cohort for the module
+	sqlquery := `SELECT cohort FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id
+								WHERE learner_cohort.learner=$1 AND cohort.module=$2`
+	if err := db.QueryRow(sqlquery, lemail, moduleId).Scan(&dummy); err != sql.ErrNoRows {
+		if err == nil {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	sqlquery = `SELECT cohort_id, weekly_tutorial_day, weekly_tutorial_time, COUNT(learner_cohort.learner) learner_count
+							FROM cohort LEFT JOIN learner_cohort ON learner_cohort.cohort = cohort.cohort_id
+							WHERE cohort.module = $1 AND cohort.status = 0
+							GROUP BY cohort_id, cohort.weekly_tutorial_day, cohort.weekly_tutorial_time`
+
+	var res []moduleCohortRes
+
+	result, err := db.Query(sqlquery, moduleId)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer result.Close()
+
+	for result.Next() {
+		var cohort moduleCohortRes
+		if err := result.Scan(&cohort.Id, &cohort.TutorialDay, &cohort.TutorialTime, &cohort.LearnerCount); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		res = append(res, cohort)
+	}
+
+	// Marshal to JSON and return
+	dres, err := json.Marshal(res)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(dres)
+}
+
+func joinCohort(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	cohortId := query.Get("cohort")
+	lemail := r.Header.Get("X-User-Claim")
+
+	if cohortId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	var cohort cohortData
+	// CHeck that the cohort is open
+	sqlquery := `SELECT cohort_id, weekly_tutorial_time, weekly_tutorial_day, module, status FROM cohort WHERE cohort_id = $1`
+	if err := db.QueryRow(sqlquery, cohortId).Scan(&cohort.Id, &cohort.WeeklyTutorialTime, &cohort.WeeklyTutorialDay, &cohort.Module, &cohort.Status); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if cohort.Status != 0 {
+		http.Error(w, "Invalid cohort id", http.StatusBadRequest)
+		return
+	}
+
+	var dummy string
+	// Check if learner is already enrolled in a cohort for the module
+	sqlquery = `SELECT cohort FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id
+								WHERE learner_cohort.learner=$1 AND cohort.module=$2`
+	if err := db.QueryRow(sqlquery, lemail, cohort.Module).Scan(&dummy); err != sql.ErrNoRows {
+		if err == nil {
+			http.Error(w, "Already enrolled in a cohort for the module", http.StatusBadRequest)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	sqlquery = `INSERT INTO learner_cohort(learner, cohort) VALUES ($1, $2)`
+	if _, err := db.Exec(sqlquery, lemail, cohortId); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var cohortLearnerCount int
+	// Check total count
+	sqlquery = `SELECT COUNT(learner_cohort.learner) learner_count
+							FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id
+							WHERE cohort.cohort_id = $1
+							GROUP BY learner_cohort.cohort`
+	if err := db.QueryRow(sqlquery, cohortId).Scan(&cohortLearnerCount); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Close enrollment into the cohort oonce full
+	if cohortLearnerCount >= 15 {
+		// Close enrollment
+		sqlquery = `UPDATE cohort SET status=1 WHERE cohort_id=$1`
+		if _, err := db.Exec(sqlquery, cohort.Id); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// Checks which cohort you've enrolled in for the module and leaves it
+func leaveModuleCohort(w http.ResponseWriter, r *http.Request) {
+	// First retrieve the cohort
+	lemail := r.Header.Get("X-User-Claim")
+	query := r.URL.Query()
+	moduleId := query.Get("module")
+
+	if moduleId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Check if they're even enrolled in any cohort
+	sqlquery := `SELECT cohort_id, status FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id 
+								WHERE learner_cohort.learner = $1 AND cohort.module = $2`
+
+	var cohortId string
+	var cohortStatus int
+
+	if err := db.QueryRow(sqlquery, lemail, moduleId).Scan(&cohortId, &cohortStatus); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if cohortStatus != 0 {
+		// It's too late to de-enroll
+		http.Error(w, "The cohort has already been finalised", http.StatusBadRequest)
+		return
+	}
+
+	// Else, all is good we cann de-enroll you
+	sqlquery = `DELETE FROM learner_cohort WHERE learner = $1 AND cohort = $2`
+	if _, err := db.Exec(sqlquery, lemail, cohortId); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+type getModuleCohortRes struct {
+	Id                 string    `json:"id"`
+	Module             string    `json:"module"`
+	Status             int       `json:"status"`
+	StartDate          time.Time `json:"start_date"`
+	WeeklyTutorialDay  int       `json:"tutorial_day"`
+	WeeklyTutorialTime int       `json:"tutorial_time"`
+	LearnerCount       int       `json:"learner_count"`
+}
+
+func getModuleCohort(w http.ResponseWriter, r *http.Request) {
+	// First retrieve the cohort
+	lemail := r.Header.Get("X-User-Claim")
+
+	// Check if they're even enrolled in any cohort should only be one cohort
+	sqlquery := `SELECT cohort_id, module, status, start_date, weekly_tutorial_day, weekly_tutorial_time FROM learner_cohort INNER JOIN cohort ON learner_cohort.cohort = cohort.cohort_id WHERE learner_cohort.learner = $1`
+
+	var res getModuleCohortRes
+
+	if err := db.QueryRow(sqlquery, lemail).Scan(&res.Id, &res.Module, &res.Status, &res.StartDate, &res.WeeklyTutorialDay, &res.WeeklyTutorialTime); err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Get the count
+	sqlquery = `SELECT COUNT(learner_cohort.learner) learner_count
+							FROM cohort LEFT JOIN learner_cohort ON learner_cohort.cohort = cohort.cohort_id
+							WHERE cohort_id = $1
+							GROUP BY cohort_id, cohort.weekly_tutorial_day, cohort.weekly_tutorial_time`
+
+	if err := db.QueryRow(sqlquery, res.Id).Scan(&res.LearnerCount); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	dres, err := json.Marshal(res)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(dres)
+}
+
+func startCohort(w http.ResponseWriter, r *http.Request) {
+	// First retrieve the cohort
+	query := r.URL.Query()
+	cohortId := query.Get("cohort")
+
+	if cohortId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	var cohort cohortData
+	cohort.Id = cohortId
+
+	cohortQuery := `SELECT module, status, start_date, weekly_tutorial_day, weekly_tutorial_time FROM cohort WHERE cohort_id=$1`
+
+	if err := db.QueryRow(cohortQuery, cohort.Id).Scan(&cohort.Module, &cohort.Status, &cohort.StartDate, &cohort.WeeklyTutorialDay, &cohort.WeeklyTutorialTime); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Calculating absolute lecture dates
+	var lectureDates []lectureDate
+	lectureQuery := `SELECT lecture_id, date_offset FROM lecture WHERE module=$1`
+	result, err := db.Query(lectureQuery, cohort.Module)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer result.Close()
+
+	for result.Next() {
+		var lDate lectureDate
+		if err := result.Scan(&lDate.Id, &lDate.RelativeDate); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Calculate the absolute date
+		lDate.AbsoluteDate = cohort.StartDate.AddDate(0, 0, lDate.RelativeDate)
+
+		lectureDates = append(lectureDates, lDate)
+	}
+
+	// Calculating absolute tutorial dates
+	var tutorialDates []tutorialDate
+
+	// Weekly Tutorial Day is relative to Monday, being 0 and 6 on Sunday
+	firstTutorialDate := cohort.StartDate.AddDate(0, 0, cohort.WeeklyTutorialDay)
+	firstTutorialDateTime := firstTutorialDate.Add(time.Minute * time.Duration(cohort.WeeklyTutorialTime))
+
+	tutorialQuery := `SELECT tutorial_id, week FROM tutorial WHERE module=$1`
+	result, err = db.Query(tutorialQuery, cohort.Module)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer result.Close()
+
+	for result.Next() {
+		var tDate tutorialDate
+		if err := result.Scan(&tDate.Id, &tDate.Week); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Calculate the absolute date
+		tDate.AbsoluteDateTime = firstTutorialDateTime.AddDate(0, 0, tDate.Week*7)
+		tutorialDates = append(tutorialDates, tDate)
+	}
+
+	// Get the learners in the cohort
+	learnerQuery := `SELECT learner FROM learner_cohort WHERE cohort=$1`
+	enrollLectureQuery := `INSERT INTO learner_lecture(learner, lecture, scheduled_date) VALUES ($1, $2, $3)`
+	enrollTutorialQuery := `INSERT INTO learner_tutorial(learner, tutorial, scheduled_datetime) VALUES ($1, $2, $3)`
+
+	// Preparing the statements
+	enrollLectureStmt, err := db.Prepare(enrollLectureQuery)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer enrollLectureStmt.Close()
+
+	enrollTutorialStmt, err := db.Prepare(enrollTutorialQuery)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer enrollTutorialStmt.Close()
+
+	result, err = db.Query(learnerQuery, cohort.Id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer result.Close()
+
+	for result.Next() {
+		var learnerId string
+		if err := result.Scan(&learnerId); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Enrolling them into the lecture
+		for _, lecture := range lectureDates {
+			if _, err := enrollLectureStmt.Exec(learnerId, lecture.Id, lecture.AbsoluteDate); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Enrolling them into the tutorials
+		for _, tutorial := range tutorialDates {
+			if _, err := enrollTutorialStmt.Exec(learnerId, tutorial.Id, tutorial.AbsoluteDateTime); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+}
+
+/*************** LECTURE HANDLERS ****************************/
+type lectureResponse struct {
 	Id            string `json:"id"`
 	Title         string `json:"title"`
 	Description   string `json:"description"`
@@ -216,13 +672,13 @@ type lessonResponse struct {
 
 func enrollModule(w http.ResponseWriter, r *http.Request) {
 
-	// Get lesson id from query params
+	// Get lecture id from query params
 	query := r.URL.Query()
 	module := query.Get("module")
-	learnerId := query.Get("learnerId")
+	lemail := query.Get("email")
 
-	// Get all of the lessons
-	sql := `SELECT lesson_id, title, description, video_link, scheduled_date, module from lesson 
+	// Get all of the lectures
+	sql := `SELECT lecture_id, title, description, video_link, scheduled_date, module from lecture 
 					WHERE module = $1`
 
 	result, err := db.Query(sql, module)
@@ -234,21 +690,21 @@ func enrollModule(w http.ResponseWriter, r *http.Request) {
 	defer result.Close()
 
 	for result.Next() {
-		var lesson lessonResponse
-		if err := result.Scan(&lesson.Id, &lesson.Title, &lesson.Description, &lesson.VideoLink, &lesson.ScheduledDate, &lesson.Module); err != nil {
+		var lecture lectureResponse
+		if err := result.Scan(&lecture.Id, &lecture.Title, &lecture.Description, &lecture.VideoLink, &lecture.ScheduledDate, &lecture.Module); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		// Create the learner_lesson
-		sql = `INSERT INTO learner_lesson(learner, lesson, completed) VALUES ($1, $2, $3)`
+		// Create the learner_lecture
+		sql = `INSERT INTO learner_lecture(learner, lecture, completed) VALUES ($1, $2, $3)`
 		stmt, err := db.Prepare(sql)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		_, err = stmt.Exec(learnerId, lesson.Id, false)
+		_, err = stmt.Exec(lemail, lecture.Id, false)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -258,18 +714,14 @@ func enrollModule(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func getLessonToday(w http.ResponseWriter, r *http.Request) {
+func getLectureToday(w http.ResponseWriter, r *http.Request) {
 
-	learnerId := r.Header.Get("X-User-Claim")
+	lemail := r.Header.Get("X-User-Claim")
+	timezone := r.Header.Get("X-Timezone-Claim")
 
-	// Get lesson id from query params
-	// query := r.URL.Query()
-	// lessonId := query.Get("id")
-	timezone := "Asia/Singapore"
+	var res lectureResponse
 
-	var res lessonResponse
-
-	// Get the current date application is date specific, regardless of timezone they should be shown some lesson at some local date
+	// Get the current date application is date specific, regardless of timezone they should be shown some lecture at some local date
 	// So take reference to a no timezone date value and compare to their timezone date
 	local := time.Now().UTC()
 	location, err := time.LoadLocation(timezone)
@@ -280,12 +732,12 @@ func getLessonToday(w http.ResponseWriter, r *http.Request) {
 
 	local = local.In(location)
 
-	// All learners have access to the module, because there is only one
-	query := `SELECT lesson_id, title, description, video_link, scheduled_date, module from lesson WHERE scheduled_date = $1`
+	query := `SELECT lecture_id, title, description, video_link, scheduled_date, completed, module from lecture 
+	INNER JOIN learner_lecture ON learner_lecture.lecture=lecture.lecture_id AND learner_lecture.learner=$1 
+	WHERE scheduled_date = $2 AND completed=$3`
 
-	// There should only be one lesson
-	err = db.QueryRow(query, local.Format("2006-01-02")).Scan(&res.Id, &res.Title, &res.Description, &res.VideoLink, &res.ScheduledDate, &res.Module)
-	res.Completed = false
+	// There should only be one lecture
+	err = db.QueryRow(query, lemail, local.Format("2006-01-02"), false).Scan(&res.Id, &res.Title, &res.Description, &res.VideoLink, &res.ScheduledDate, &res.Completed, &res.Module)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -297,43 +749,52 @@ func getLessonToday(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var completed bool
-
-	// Check if lesson is completed
-	query = `SELECT completed FROM learner_lesson WHERE lesson = $1 AND learner = $2`
-	err = db.QueryRow(query, res.Id, learnerId).Scan(&completed)
+	dres, err := json.Marshal(res)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if completed == true {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	} else {
-		dres, err := json.Marshal(res)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.Write(dres)
-	}
+	w.Write(dres)
 }
 
-func getLessonsPast(w http.ResponseWriter, r *http.Request) {
-	learnerId := r.Header.Get("X-User-Claim")
+func getLecturesPast(w http.ResponseWriter, r *http.Request) {
+	lemail := r.Header.Get("X-User-Claim")
+	timezone := r.Header.Get("X-Timezone-Claim")
 
-	var res []lessonResponse
+	query := r.URL.Query()
+	moduleId := query.Get("module")
 
-	// Selecting all lessons that happened earlier than today
-	sql := `SELECT lesson_id, title, description, video_link, scheduled_date, module, completed from lesson
-					LEFT JOIN learner_lesson
-					ON lesson.lesson_id = learner_lesson.lesson AND learner_lesson.learner = $1
-					WHERE scheduled_date <= CURRENT_DATE`
+	if moduleId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
 
-	result, err := db.Query(sql, learnerId)
+	var res []lectureResponse
+
+	// Get the current date application is date specific, regardless of timezone they should be shown some lecture at some local date
+	// So take reference to a no timezone date value and compare to their timezone date
+	local := time.Now().UTC()
+	location, err := time.LoadLocation(timezone)
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	local = local.In(location)
+
+	// Selecting all lectures that happened earlier than today
+	sqlquery := `SELECT lecture_id, title, description, video_link, scheduled_date, module, completed from lecture
+					LEFT JOIN learner_lecture
+					ON lecture.lecture_id = learner_lecture.lecture AND learner_lecture.learner = $1
+					WHERE scheduled_date <= $2 AND module = $3`
+
+	result, err := db.Query(sqlquery, lemail, local.Format("2006-01-02"), moduleId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -341,13 +802,18 @@ func getLessonsPast(w http.ResponseWriter, r *http.Request) {
 	defer result.Close()
 
 	for result.Next() {
-		var lesson lessonResponse
-		if err := result.Scan(&lesson.Id, &lesson.Title, &lesson.Description, &lesson.VideoLink, &lesson.ScheduledDate, &lesson.Module, &lesson.Completed); err != nil {
+		var lecture lectureResponse
+		if err := result.Scan(&lecture.Id, &lecture.Title, &lecture.Description, &lecture.VideoLink, &lecture.ScheduledDate, &lecture.Module, &lecture.Completed); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		res = append(res, lesson)
+		res = append(res, lecture)
+	}
+
+	if len(res) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
 
 	// Marshal to JSON and return
@@ -358,25 +824,24 @@ func getLessonsPast(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write(dres)
-
 }
 
-func completeLesson(w http.ResponseWriter, r *http.Request) {
-	learnerId := r.Header.Get("X-User-Claim")
+func completeLecture(w http.ResponseWriter, r *http.Request) {
+	lemail := r.Header.Get("X-User-Claim")
 
-	// Get lesson id from query params
+	// Get lecture id from query params
 	query := r.URL.Query()
-	lessonId := query.Get("id")
+	lectureId := query.Get("id")
 
-	if lessonId == "" {
-		http.Error(w, "No valid lesson id provided", http.StatusBadRequest)
+	if lectureId == "" {
+		http.Error(w, "No valid lecture id provided", http.StatusBadRequest)
 		return
 	}
 
-	// Get all the flashcards associated to this lesson
+	// Get all the flashcards associated to this lecture
 	var flashcardIds []string
-	sql := `SELECT flashcard_id FROM flashcard WHERE lesson = $1`
-	result, err := db.Query(sql, lessonId)
+	sql := `SELECT flashcard_id FROM flashcard WHERE lecture = $1`
+	result, err := db.Query(sql, lectureId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -403,7 +868,7 @@ func completeLesson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, flashcardId := range flashcardIds {
-		_, err = stmt.Exec(learnerId, flashcardId)
+		_, err = stmt.Exec(lemail, flashcardId)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -411,15 +876,15 @@ func completeLesson(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	// Update the learner_lesson data
-	sql = `UPDATE learner_lesson SET completed = true WHERE learner_lesson.learner = $1 AND learner_lesson.lesson = $2`
+	// Update the learner_lecture data
+	sql = `UPDATE learner_lecture SET completed = true WHERE learner_lecture.learner = $1 AND learner_lecture.lecture = $2`
 	stmt, err = db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_, err = stmt.Exec(learnerId, lessonId)
+	_, err = stmt.Exec(lemail, lectureId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -430,24 +895,24 @@ type flashcardResponse struct {
 	Id         string `json:"id"`
 	TopSide    string `json:"top_side"`
 	BottomSide string `json:"bottom_side"`
-	LessonId   string `json:"lesson_id"`
+	LectureId  string `json:"lecture_id"`
 }
 
-// You need to ensure that the lesson flashcards exist for the user
-func getLessonFlashcards(w http.ResponseWriter, r *http.Request) {
+// You need to ensure that the lecture flashcards exist for the user
+func getLectureFlashcards(w http.ResponseWriter, r *http.Request) {
 
 	var res []flashcardResponse
-	// Get lesson id from query params
+	// Get lecture id from query params
 	query := r.URL.Query()
-	lessonId := query.Get("id")
+	lectureId := query.Get("id")
 
-	if lessonId == "" {
-		http.Error(w, "No valid lesson id provided", http.StatusBadRequest)
+	if lectureId == "" {
+		http.Error(w, "No valid lecture id provided", http.StatusBadRequest)
 		return
 	}
 
-	sql := `SELECT flashcard_id, top_side, bottom_side, lesson FROM flashcard WHERE lesson = $1`
-	result, err := db.Query(sql, lessonId)
+	sql := `SELECT flashcard_id, top_side, bottom_side, lecture FROM flashcard WHERE lecture = $1`
+	result, err := db.Query(sql, lectureId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -457,7 +922,7 @@ func getLessonFlashcards(w http.ResponseWriter, r *http.Request) {
 
 	for result.Next() {
 		var card flashcardResponse
-		if err := result.Scan(&card.Id, &card.TopSide, &card.BottomSide, &card.LessonId); err != nil {
+		if err := result.Scan(&card.Id, &card.TopSide, &card.BottomSide, &card.LectureId); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -487,8 +952,19 @@ type tutorialResponse struct {
 func getUpcomingTutorials(w http.ResponseWriter, r *http.Request) {
 	var res []tutorialResponse
 
-	sql := `SELECT tutorial_id, title, description, scheduled_datetime, module FROM tutorial WHERE scheduled_datetime > NOW() LIMIT 5`
-	result, err := db.Query(sql)
+	lemail := r.Header.Get("X-User-Claim")
+
+	query := r.URL.Query()
+	moduleId := query.Get("module")
+	if moduleId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	sqlquery := `SELECT tutorial_id, title, description, scheduled_datetime, module FROM tutorial
+		INNER JOIN learner_tutorial ON learner_tutorial.tutorial=tutorial.tutorial_id AND learner_tutorial.learner=$1
+		WHERE scheduled_datetime > NOW() AND module = $2 LIMIT 5`
+	result, err := db.Query(sqlquery, lemail, moduleId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -506,6 +982,10 @@ func getUpcomingTutorials(w http.ResponseWriter, r *http.Request) {
 		res = append(res, tutorial)
 	}
 
+	if len(res) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+	}
+
 	// Marshal to JSON and return
 	dres, err := json.Marshal(res)
 	if err != nil {
@@ -518,46 +998,47 @@ func getUpcomingTutorials(w http.ResponseWriter, r *http.Request) {
 
 /******************* DAILY REVIEW HANDLERS ******************/
 func getDailyReview(w http.ResponseWriter, r *http.Request) {
-	learnerId := r.Header.Get("X-User-Claim")
+	lemail := r.Header.Get("X-User-Claim")
 
 	var res []flashcardResponse
 
 	// Retrieve and check last completed
-	var user userResponse
+	var lastCompleted time.Time
+	var timezoneStr string
 
-	sql := `SELECT learner_id, username, first_name, last_completed, streak FROM learner WHERE learner_id = $1`
-	if err := db.QueryRow(sql, learnerId).Scan(&user.Id, &user.Username, &user.FirstName, &user.LastCompleted, &user.Streak); err != nil {
+	sqlquery := `SELECT last_completed, timezone FROM learner WHERE email = $1`
+	if err := db.QueryRow(sqlquery, lemail).Scan(&lastCompleted, &timezoneStr); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// start and end of day
-	timezone := "Asia/Singapore"
-
 	now := time.Now().UTC()
-	location, err := time.LoadLocation(timezone)
-
-	// Last completed should already be in UTC because of TimezoneTZ
-	if err == nil {
-		now = now.In(location)
-		user.LastCompleted = user.LastCompleted.In(location)
+	location, err := time.LoadLocation(timezoneStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	d1 := time.Date(user.LastCompleted.Year(), user.LastCompleted.Month(), user.LastCompleted.Day(), 0, 0, 0, 0, user.LastCompleted.Location())
+	// Last completed should already be in UTC because of TimezoneTZ
+	now = now.In(location)
+	lastCompleted = lastCompleted.In(location)
+
+	d1 := time.Date(lastCompleted.Year(), lastCompleted.Month(), lastCompleted.Day(), 0, 0, 0, 0, lastCompleted.Location())
 	d2 := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	fmt.Println(d1)
 	fmt.Println(d2)
 
+	// Today's review is already completed
 	if d1.Unix() == d2.Unix() {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
-	// First retrieve all the repeat due ones
-	sql = `SELECT flashcard_id, top_side, bottom_side, lesson FROM flashcard RIGHT JOIN learner_flashcard ON flashcard.flashcard_id = learner_flashcard.flashcard WHERE learner = $1 AND repeat > 0`
+	// Check for existing scheduled flashcards
+	sqlquery = `SELECT flashcard_id, top_side, bottom_side, lecture FROM flashcard RIGHT JOIN learner_flashcard ON flashcard.flashcard_id = learner_flashcard.flashcard WHERE learner = $1 AND selected = $2`
 
-	result, err := db.Query(sql, learnerId)
+	result, err := db.Query(sqlquery, lemail, d2)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -567,7 +1048,42 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 
 	for result.Next() {
 		var flashcard flashcardResponse
-		if err := result.Scan(&flashcard.Id, &flashcard.TopSide, &flashcard.BottomSide, &flashcard.LessonId); err != nil {
+		if err := result.Scan(&flashcard.Id, &flashcard.TopSide, &flashcard.BottomSide, &flashcard.LectureId); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		res = append(res, flashcard)
+	}
+
+	if len(res) != 0 {
+		// Just return the response because we've already scheduled stuff for today
+		// Marshal to JSON and return
+		dres, err := json.Marshal(res)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Write(dres)
+		return
+	}
+
+	// Need to request for the schedule
+	// First retrieve all the repeat due ones
+	sqlquery = `SELECT flashcard_id, top_side, bottom_side, lecture FROM flashcard RIGHT JOIN learner_flashcard ON flashcard.flashcard_id = learner_flashcard.flashcard WHERE learner = $1 AND repeat > 0`
+
+	result, err = db.Query(sqlquery, lemail)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer result.Close()
+
+	for result.Next() {
+		var flashcard flashcardResponse
+		if err := result.Scan(&flashcard.Id, &flashcard.TopSide, &flashcard.BottomSide, &flashcard.LectureId); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -576,8 +1092,8 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var allFlashcards []flashcardResponse
-	sql = `SELECT flashcard_id, top_side, bottom_side, lesson FROM flashcard RIGHT JOIN learner_flashcard ON flashcard.flashcard_id = learner_flashcard.flashcard WHERE learner = $1 AND repeat = 0`
-	result, err = db.Query(sql, learnerId)
+	sqlquery = `SELECT flashcard_id, top_side, bottom_side, lecture FROM flashcard RIGHT JOIN learner_flashcard ON flashcard.flashcard_id = learner_flashcard.flashcard WHERE learner = $1 AND repeat = 0`
+	result, err = db.Query(sqlquery, lemail)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -587,7 +1103,7 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 
 	for result.Next() {
 		var flashcard flashcardResponse
-		if err := result.Scan(&flashcard.Id, &flashcard.TopSide, &flashcard.BottomSide, &flashcard.LessonId); err != nil {
+		if err := result.Scan(&flashcard.Id, &flashcard.TopSide, &flashcard.BottomSide, &flashcard.LectureId); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -599,7 +1115,9 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 	remaining := 20 - len(res)
 	total := len(allFlashcards)
 
-	if remaining >= total {
+	if remaining <= 0 {
+		// do nothing
+	} else if remaining >= total {
 		// just return all the cards
 		for _, card := range allFlashcards {
 			res = append(res, card)
@@ -611,6 +1129,28 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 
 		for _, value := range v {
 			res = append(res, allFlashcards[value])
+		}
+	}
+
+	if len(res) == 0 {
+		// Means there are no flashcards at all, user didn't do any microlectures
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	// Update the database to show that these are marked to be done today
+	sqlquery = `UPDATE learner_flashcard SET selected = $1 WHERE learner = $2 AND flashcard = $3`
+	stmt, err := db.Prepare(sqlquery)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, flashcard := range res {
+		_, err = stmt.Exec(d2, lemail, flashcard.Id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -626,16 +1166,16 @@ func getDailyReview(w http.ResponseWriter, r *http.Request) {
 }
 
 func passFlashcard(w http.ResponseWriter, r *http.Request) {
-	learnerId := r.Header.Get("X-User-Claim")
+	lemail := r.Header.Get("X-User-Claim")
 
-	// Get lesson id from query params
+	// Get lecture id from query params
 	query := r.URL.Query()
 	flashcardId := query.Get("id")
 
 	var repeat int
 
 	sql := `SELECT repeat FROM learner_flashcard WHERE learner = $1 AND flashcard = $2`
-	if err := db.QueryRow(sql, learnerId, flashcardId).Scan(&repeat); err != nil {
+	if err := db.QueryRow(sql, lemail, flashcardId).Scan(&repeat); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -645,14 +1185,14 @@ func passFlashcard(w http.ResponseWriter, r *http.Request) {
 		repeat -= 1
 	}
 
-	sql = `UPDATE learner_flashcard SET repeat = $1 WHERE learner = $2 AND flashcard = $3`
+	sql = `UPDATE learner_flashcard SET repeat = $1, selected = NULL WHERE learner = $2 AND flashcard = $3`
 	stmt, err := db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_, err = stmt.Exec(repeat, learnerId, flashcardId)
+	_, err = stmt.Exec(repeat, lemail, flashcardId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -662,23 +1202,23 @@ func passFlashcard(w http.ResponseWriter, r *http.Request) {
 }
 
 func failFlashcard(w http.ResponseWriter, r *http.Request) {
-	learnerId := r.Header.Get("X-User-Claim")
+	lemail := r.Header.Get("X-User-Claim")
 
-	// Get lesson id from query params
+	// Get lecture id from query params
 	query := r.URL.Query()
 	flashcardId := query.Get("id")
 
 	// set repeat to 3 no matter what
 	repeat := 3
 
-	sql := `UPDATE learner_flashcard SET repeat = $1 WHERE learner = $2 AND flashcard = $3`
+	sql := `UPDATE learner_flashcard SET repeat = $1, selected = NULL WHERE learner = $2 AND flashcard = $3`
 	stmt, err := db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_, err = stmt.Exec(repeat, learnerId, flashcardId)
+	_, err = stmt.Exec(repeat, lemail, flashcardId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -688,25 +1228,25 @@ func failFlashcard(w http.ResponseWriter, r *http.Request) {
 }
 
 func completeReview(w http.ResponseWriter, r *http.Request) {
-	learnerId := r.Header.Get("X-User-Claim")
+	lemail := r.Header.Get("X-User-Claim")
 
 	// Retrieve the learner
-	var user userResponse
+	var streak int
 
-	sql := `SELECT learner_id, username, first_name, streak FROM learner WHERE learner_id = $1`
-	if err := db.QueryRow(sql, learnerId).Scan(&user.Id, &user.Username, &user.FirstName, &user.Streak); err != nil {
+	sql := `SELECT streak FROM learner WHERE email = $1`
+	if err := db.QueryRow(sql, lemail).Scan(&streak); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	sql = `UPDATE learner SET streak = $1, last_completed = $2 WHERE learner_id = $3`
+	sql = `UPDATE learner SET streak = $1, last_completed = $2 WHERE email = $3`
 	stmt, err := db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_, err = stmt.Exec(user.Streak+1, time.Now().UTC(), learnerId)
+	_, err = stmt.Exec(streak+1, time.Now().UTC(), lemail)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -738,72 +1278,75 @@ func authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		splitToken := strings.Split(reqToken, "Bearer")
-
-		if len(splitToken) != 2 {
-			http.Error(w, "Malformed format for auth token", http.StatusForbidden)
-			return
-		}
-
-		reqToken = strings.TrimSpace(splitToken[1])
-
-		parsedToken, err := jwt.Parse(reqToken, func(token *jwt.Token) (interface{}, error) {
-			// Don't forget to validate the alg is what you expect
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, errors.New("Invalid Signing Type")
-			}
-
-			return []byte(JWT_SECRET), nil
-		})
-
-		// Invalid JWT secret error
+		ctx := context.Background()
+		client, err := fb.Auth(ctx)
 		if err != nil {
-			http.Error(w, "Authentication failed", http.StatusForbidden)
+			http.Error(w, "Error validating auth token", http.StatusInternalServerError)
 			return
 		}
 
-		// Parsing the claims in the JWT token
-		if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok && parsedToken.Valid {
-			// If the claims doesn't include the Id or the UserType, throw an error
-			if claims["id"] == nil {
-				http.Error(w, "Authentication claims failed", http.StatusForbidden)
-				return
-			}
-
-			uid := claims["id"].(string)
-
-			r.Header.Set("X-User-Claim", uid)
-
-			next.ServeHTTP(w, r)
-		} else {
+		token, err := client.VerifyIDToken(ctx, reqToken)
+		if err != nil {
 			http.Error(w, "Auth token invalid", http.StatusForbidden)
 			return
 		}
+
+		// Valid auth token received check if user exists
+		email := token.Claims["email"].(string)
+		var timezone string
+
+		// Get the user associated to the email if it exists
+		sqlquery := `SELECT email, timezone FROM learner WHERE email = $1`
+		err = db.QueryRow(sqlquery, email).Scan(&email, &timezone)
+
+		if err == sql.ErrNoRows {
+			// Means that the user is new and has to be created
+			sqlquery = `INSERT INTO learner(email) VALUES ($1)`
+
+			stmt, err := db.Prepare(sqlquery)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			_, err = stmt.Exec(email)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			// Successfully created user go create the Header
+		} else if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		r.Header.Set("X-User-Claim", email)
+		r.Header.Set("X-Timezone-Claim", timezone)
+		next.ServeHTTP(w, r)
 	})
 }
 
 /********* UTILITIES **************/
-func createJWT(uid string, secret string) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id": uid,
-	})
-	tokenString, err := token.SignedString([]byte(secret))
-
-	return tokenString, err
-}
-
-func HashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	return string(bytes), err
-}
-
-func CheckPasswordHash(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
-}
-
 func PanicOnError(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func checkEnvVariable(env string) {
+	if env == "" {
+		log.Panic("Some environmental variables are not populated")
+		return
+	}
+}
+
+var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+
+// isEmailValid checks if the email provided passes the required structure and length.
+func isEmailValid(e string) bool {
+	if len(e) < 3 && len(e) > 254 {
+		return false
+	}
+	return emailRegex.MatchString(e)
 }

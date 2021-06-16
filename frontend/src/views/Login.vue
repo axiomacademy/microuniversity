@@ -56,7 +56,7 @@ let googleProvider = new firebase.auth.GoogleAuthProvider();
 let actionCodeSettings = {
   // URL you want to redirect back to. The domain (www.example.com) for this
   // URL must be in the authorized domains list in the Firebase Console.
-  url: 'http://localhost:8080/#/verify',
+  url: 'https://betav2.axiom.academy/#/verify',
   // This must be true.
   handleCodeInApp: true,
 };

@@ -160,7 +160,6 @@ export default {
         await this.getModuleAvailableCohorts()
 
         this.enrolled = false
-        this.showAvailability = true
         this.loading = false
       } else {
         this.$router.push({ name: 'login' })

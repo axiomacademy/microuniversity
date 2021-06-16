@@ -1,1 +1,1 @@
-export const baseUrl = "http://localhost:8000/api/v0.2";
+export const baseUrl = "https://betav2.axiom.academy/api/v0.2";

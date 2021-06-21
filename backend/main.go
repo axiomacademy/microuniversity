@@ -24,6 +24,7 @@ import (
 // Global environmental variables
 var DB_URL string
 var JWT_SECRET string
+var FIREBASE_CREDS string
 
 // Global handlers for simplicity
 var db *sql.DB
@@ -34,14 +35,17 @@ func main() {
 	fmt.Println("Server initialising...")
 
 	// Getting all the environmental variables
-	DB_URL = os.Getenv("DB_URL")
+	DB_URL = os.Getenv("DATABASE_URL")
 	checkEnvVariable(DB_URL)
 	JWT_SECRET = os.Getenv("JWT_SECRET")
 	checkEnvVariable(JWT_SECRET)
+	FIREBASE_CREDS = os.Getenv("FIREBASE_CREDS")
+	checkEnvVariable(FIREBASE_CREDS)
 
 	// Loading up firebase
 	var err error
-	opt := option.WithCredentialsFile("./fb-creds.json")
+	// opt := option.WithCredentialsFile("./fb-creds.json")
+	opt := option.WithCredentialsJSON([]byte(FIREBASE_CREDS))
 	fb, err = firebase.NewApp(context.Background(), nil, opt)
 	PanicOnError(err)
 

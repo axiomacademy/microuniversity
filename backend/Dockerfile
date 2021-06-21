@@ -11,6 +11,5 @@ FROM alpine:3.13
 WORKDIR /root/
 RUN apk add --no-cache tzdata
 COPY --from=builder /app/main .
-COPY fb-creds.json .
 EXPOSE 8000
 CMD ["sh", "-c", "'sleep 20 && ./main'"]

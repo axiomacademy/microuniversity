@@ -56,12 +56,21 @@ func (t *Tutorial) toGql() GqlTutorial {
 	}
 }
 
+type TutorialCohort struct {
+	Uid      string    `json:"uid,omitempty"`
+	Tutorial Tutorial  `json:"TutorialCohort.tutorial,omitempty"`
+	Status   string    `json:"TutorialCohort.status,omitempty"`
+	Members  []Learner `json:"TutorialCohort.members,omitempty"`
+}
+
 type Learner struct {
 	Uid               string              `json:"uid,omitempty"`
 	Cards             []LearnerReviewCard `json:"Learner.cards,omitempty"`
 	Challenges        []LearnerChallenge  `json:"Learner.challenges,omitempty"`
 	LastCompleted     time.Time           `json:"Learner.lastCompleted,omitempty"`
 	CompletedLectures []Lecture           `json:"Learner.completedLectures,omitempty"`
+	UnlockedTutorials []Tutorial          `json:"Learner.unlockedTutorials,omitempty"`
+	ActiveCohorts     []TutorialCohort    `json:"Learner.activeCohorts,omitempty"`
 }
 
 func (l *Learner) toGql() GqlLearner {

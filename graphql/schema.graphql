@@ -26,6 +26,8 @@ type Learner @auth(
   completedLectures: [Lecture!]! @hasInverse(field: completedLearners)
   cards: [LearnerReviewCard!]! @hasInverse(field: learner)
   challenges: [LearnerChallenge!]! @hasInverse(field: learner)
+  unlockedTutorials: [Tutorial!]!
+  activeCohorts: [TutorialCohort!]!
 
   recommendedLectures: [Lecture!]! @custom(http: {
     url: "http://192.168.10.139:8003/api/v0.3/lecture/recommended"
@@ -317,7 +319,7 @@ type Mutation {
     forwardHeaders: ["Authorization"]
   })
 
-  completeChallenge(id: ID!): Boolean @custom(http: {
+  completeChallenge(id: ID!): [Tutorial!]! @custom(http: {
     url: "http://10.114.10.86:8003/api/v0.3/challenge/complete?challengeId=$id"
     method: "POST",
     forwardHeaders: ["Authorization"]

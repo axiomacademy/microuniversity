@@ -77,6 +77,168 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8003", r))
 }
 
+/************************* TUTORIAL HANDLERS ************************************/
+func enrollTutorial(w http.ResponseWriter, r *http.Request) {
+	luid := r.Header.Get("X-Uid-Claim")
+	query := r.URL.Query()
+	tutorialId := query.Get("tutorialId")
+
+	if tutorialId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Check that you've unlocked the tutorial
+	const checkIfTutorialUnlocked = `
+		query checkIfTutorialUnlocked($tutorialId: string, $learnerId: string) {
+			checkIfTutorialUnlocked(func: uid($learnerId)) {
+				Learner.unlockedTutorials @filter(uid($tutorialId)) {
+					uid
+				}
+			}
+		}
+	`
+
+	txn := c.NewTxn()
+	defer txn.Discard(r.Context())
+
+	resp, err := txn.QueryWithVars(r.Context(), checkIfTutorialUnlocked, map[string]string{
+		"$tutorialId": tutorialId,
+		"$learnerId":  luid,
+	})
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var decode struct {
+		CheckIfTutorialUnlocked []Learner
+	}
+
+	if err := json.Unmarshal(resp.GetJson(), &decode); err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if len(decode.CheckIfTutorialUnlocked) != 1 {
+		fmt.Println("Oops")
+		http.Error(w, "oops", http.StatusInternalServerError)
+		return
+	}
+
+	// Tutorial is unlocked so find a cohort
+	const findACohort = `
+		query findACohort($tutorialId: string) {
+			findACohort(func: type("TutorialCohort")) @filter(uid_in(TutorialCohort.tutorial, $tutorialId) AND eq(TutorialCohort.status, "FILLING")) {
+				uid
+			}
+		}
+	`
+
+	resp, err := txn.QueryWithVars(r.Context(), checkIfTutorialUnlocked, map[string]string{
+		"$tutorialId": tutorialId,
+	})
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var decode1 struct {
+		FindACohort []TutorialCohort
+	}
+
+	if err := json.Unmarshal(resp.GetJson(), &decode1); err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var tc TutorialCohort
+
+	if len(decode1.FindACohort) == 0 {
+		// Create a cohort instead\
+		tc = TutorialCohort{
+			Uid: "_:new",
+			Tutorial: Tutorial{
+				Uid: tutorialId,
+			},
+			Status: "FILLING",
+			Members: []Learner{
+				Learner{
+					Uid: luid,
+				},
+			},
+		}
+	} else {
+		tc = TutorialCohort{
+			Tutorial: Tutorial{
+				Uid: decode1.FindACohort[0].Uid,
+			},
+			Status: "FILLING",
+			Members: []Learner{
+				Learner{
+					Uid: luid,
+				},
+			},
+		}
+
+		if len(decode1.FindACohort[0].Members) == 2 {
+			tc.Status = "FILLED"
+		}
+	}
+
+	l := Learner{
+		Uid: luid,
+		ActiveCohorts: []TutorialCohort{
+			tc,
+		},
+	}
+
+	createTutorial, err := json.Marshal(tc)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	createLearnerLink, err := json.Marshal(l)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	mu := &api.Mutation{
+		SetJson: createTutorial,
+	}
+
+	mu1 := &api.Mutation{
+		SetJson: createLearnerLink,
+	}
+
+	req := &api.Request{Mutations: []*api.Mutation{mu, mu1}}
+
+	_, err := txn.Do(r.Context(), req)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	/*
+		err = txn.Commit(r.Context())
+		if err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}*/
+
+	w.Write([]byte("true"))
+	return
+
+}
+
 /************************* CHALLENGE HANDLERS ***********************************/
 func completeChallenge(w http.ResponseWriter, r *http.Request) {
 	luid := r.Header.Get("X-Uid-Claim")
@@ -94,6 +256,16 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 			checkIfChallengeComplete(func: uid($learnerId)) {
 				Learner.challenges @filter(uid($challengeId)) {
 					LearnerChallenge.status
+					LearnerChallenge.challenge {
+						Challenge.unlocksTutorials {
+							uid
+							Tutorial.title
+							Tutorial.requiredChallenges {
+								uid
+								Challenge.title
+							}
+						}
+					}
 				}
 			}
 		}
@@ -122,19 +294,147 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(decode.GetReviewCard) != 1 {
+	if len(decode.CheckIfChallengeComplete) != 1 {
 		fmt.Println("Oops")
 		http.Error(w, "oops", http.StatusInternalServerError)
 		return
 	}
 
-	if decode.GetReviewCard[0].Status == "COMPLETED" {
+	if decode.CheckIfChallengeComplete[0].Status == "COMPLETED" {
 		fmt.Println("Already complete")
 		http.Error(w, "Already complete", http.StatusBadRequest)
 		return
 	}
 
-	fmt.Println(resp)
+	// Set challenge to completed
+	decode.CheckIfChallengeComplete[0].Status = "COMPLETED"
+
+	updateChallenge, err := json.Marshal(decode.CheckIfChallengeComplete[0])
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	mu := &api.Mutation{
+		SetJson: updateChallenge,
+	}
+
+	_, err = txn.Mutate(r.Context(), mu)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check all the tutorials to see if anything should be unlocks
+	const getTutorialUnlocked = `
+		query getTutorialUnlocked($tutorialId: string, $learnerId: string) {
+			var(func: uid($tutorialId)) {
+				A as Tutorial.requiredChallenges {
+					uid
+					Challenge.title
+				}
+			}
+  
+			getLearnerChallenges(func: uid($learnerId)) {
+				Learner.challenges @filter(uid_in(LearnerChallenge.challenge, uid(A)) AND eq(LearnerChallenge.status, "DONE")) {
+					uid
+					LearnerChallenge.challenge {
+						uid
+						Challenge.title
+					}
+				}
+			}
+		}
+	`
+
+	tutorials := decode.CheckIfChallengeComplete[0].Challenge.UnlocksTutorials
+	var unlockedTutorials []Tutorial
+
+	for _, tutorial := range tutorials {
+		resp, err := txn.QueryWithVars(r.Context(), getTutorialUnlocked, map[string]string{
+			"$tutorialId": tutorial.Uid,
+			"$learnerId":  luid,
+		})
+		if err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var decode1 struct {
+			GetLearnerChallenges []Learner
+		}
+
+		if err := json.Unmarshal(resp.GetJson(), &decode1); err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if len(decode1.GetLearnerChallenges) != 1 {
+			fmt.Println("Oops")
+			http.Error(w, "oops", http.StatusInternalServerError)
+			return
+		}
+
+		completedCount := len(decode1.GetLearnerChallenges[0].Challenges)
+		unlockCount := len(tutorial.RequiredChallenges)
+
+		// Then we're ready to unlock
+		if completedCount == unlockCount {
+			unlockedTutorials = append(unlockedTutorials, tutorial)
+		}
+	}
+
+	// Add unlocked tutorials
+	l := Learner{
+		Uid:               luid,
+		UnlockedTutorials: unlockedTutorials,
+	}
+
+	pl, err := json.Marshal(l)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	mu1 := &api.Mutation{
+		SetJson: pl,
+	}
+
+	_, err = txn.Mutate(r.Context(), mu1)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	/*
+		err = txn.Commit(r.Context())
+		if err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}*/
+
+	var gqlTutorials []GqlTutorial
+
+	for _, tutorial := range unlockedTutorials {
+		gqlTutorials = append(gqlTutorials, tutorial.toGql())
+	}
+
+	dres, err := json.Marshal(gqlTutorials)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println(string(dres))
+
+	w.Write(dres)
 }
 
 /************************* REVIEW HANDLERS ***********************************/

@@ -49,8 +49,12 @@ import { getSelf } from '../services/LearnerService'
 
 import firebase from "firebase/app";
 import "firebase/auth";
+import "firebase/functions";
 
 let googleProvider = new firebase.auth.GoogleAuthProvider();
+
+// Imported firebase function
+const addUserClaim = firebase.functions().httpsCallable('addUserClaim');
 
 // Settinng up email configuration
 let actionCodeSettings = {
@@ -73,15 +77,35 @@ export default {
       errorText: "",
       email: "",
       verificationSent: false,
+      unsubAuth: null,
     }
   },
   created: async function () {
     // # Check if logged in firebase
-    firebase.auth().onAuthStateChanged((user) => {
+    this.unsubAuth = firebase.auth().onAuthStateChanged(async (user) => {
+      console.log("Login")
       if (user) {
-        this.$router.push({ name: 'home' })
+        addUserClaim({email: user.email})
+        let token = await user.getIdToken()
+
+        // Store the token in localStorage
+        localStorage.setItem("FB_TOKEN", token)
+        localStorage.setItem("EMAIL", user.email)
+        
+        // CHeck if they're a new user
+        let res = await getSelf(token, user.email)
+
+        if (res.data.getLearner == null) {
+          // Go to the account creation page
+          this.$router.push({ name: 'register' })
+        } else {
+          this.$router.push({ name: 'home'})
+        }
       }
     })
+  },
+  beforeDestroy() {
+    this.unsubAuth()
   },
   methods: {
     loginWithEmail: async function () {
@@ -104,24 +128,13 @@ export default {
       this.loadingGoogle = true
       try {
         await firebase.auth().signInWithPopup(googleProvider) 
-
-        // CHeck if they're a new user
-        let token = await firebase.auth().currentUser.getIdToken(true)
-        console.log(token)
-        let self = await getSelf(token)
-        
-        if (self.first_name == "" || self.last_name == "") {
-          this.$router.push({ name: 'register' })
-        } else {
-          this.$router.push({ name: 'home'})
-        }
       } catch (err) {
         console.log(err)
         this.errorText = "We can't log you in right now. Try again later :("
         this.loadingGoogle = false
       }
       return
-    },
+    }
   }
 }
 </script>

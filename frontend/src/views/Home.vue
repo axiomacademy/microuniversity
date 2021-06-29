@@ -11,13 +11,10 @@
       </ul>
 
       <!-- Hamburger menu -->
-    <div v-if="showMenu" class="absolute bottom-0 right-0 -mb-40 mr-4 bg-purple-100 shadow-sm flex w-8/12 md:w-4/12 rounded-md overflow-hidden">
+    <div v-if="showMenu" class="absolute bottom-0 right-0 -mb-32 mr-4 bg-purple-100 shadow-sm flex w-8/12 md:w-4/12 rounded-md overflow-hidden">
       <ul class="flex flex-col w-full">
         <li class="text-sm px-4 py-3 text-text">Signed in as <span class="font-medium">{{ email }}</span></li>
         <div class="bg-purple-200 w-full" style="height: 1px;"></div>
-        <button @click="$router.push({name: 'modules'});"  class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200">
-          My Modules
-        </button>
         <button @click="$router.push({ name: 'profile' })" class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200 focus:bg-purple-200">
           Profile
         </button>
@@ -33,7 +30,6 @@
       <!-- Explore tab with modules, enrolled cohorts etc. -->
       <div v-if="openTab == 'Explore'" id="explore-tab">
         <h1 class="font-display text-2xl text-secondary pl-4 mt-6">Explore Modules 🧠</h1> 
-        <ModuleListElement v-for="module in modules" @click.native="moduleOpen(module)" :key="module.id" :title="module.title" :id="module.id" :description="module.description" :image="module.image" :duration="module.duration"/>
       </div>
 
       <!-- Learning tab with daily review, lessons and tutorials -->
@@ -42,7 +38,7 @@
         <!-- Daily lecture section -->
         <h1 class="font-display text-2xl text-secondary pl-4 mt-8">Today's Lecture</h1> 
         <DailyLectureCard class="mt-4" :todayLecture="this.todayLecture" :token="this.token" /> 
-        <button class="bg-purple-200 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-4" @click="activeLecturesOpen()">View previous lectures...</button>
+        <button class="bg-purple-200 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-4">View previous lectures...</button>
         <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal mb-2">Upcoming Tutorials</h1>
 
         <!-- Generating Tutorial List -->
@@ -78,18 +74,11 @@
 <script>
 import DailyReviewCard from '../components/DailyReviewCard.vue'
 import DailyLectureCard from '../components/DailyLectureCard.vue'
-import ModuleListElement from '../components/ModuleListElement.vue'
 import TutorialListElement from '../components/TutorialListElement.vue'
 import { MoonLoader } from '@saeris/vue-spinners'
 
 
 // Services
-import { getSelf } from '../services/LearnerService.js'
-import { getSelfActiveCohort } from '../services/CohortService.js'
-import { getLectureToday } from '../services/LectureService.js'
-import { getUpcomingTutorials } from '../services/TutorialService.js'
-import { getDailyReview } from '../services/ReviewService.js'
-import { getModules } from '../services/ModuleService.js'
 
 import firebase from "firebase/app";
 import "firebase/auth";
@@ -99,7 +88,6 @@ export default {
   components: {
     DailyReviewCard,
     DailyLectureCard,
-    ModuleListElement,
     TutorialListElement,
     MoonLoader,
   },
@@ -112,10 +100,10 @@ export default {
       todayLecture: null,
       upcomingTutorials: [],
       dailyReviewCards: [],
-      modules: [],
       openTab: "Learn",
       showMenu: false,
       existingCohort: {},
+      unsubAuth: null,
     }
   },
   computed: {
@@ -130,25 +118,18 @@ export default {
     this.loading = true
 
     // Based on observer
-    firebase.auth().onAuthStateChanged(async (user) => {
+    this.unsubAuth = firebase.auth().onAuthStateChanged(async (user) => {
+      console.log("Home")
       this.loading = true
       if (user) {
-        this.token = await user.getIdToken(true) 
-        
-        // Get all the important data
-        let self = await getSelf(this.token)
+        this.token = await user.getIdToken(true)
+        this.email = user.email
 
-        // Check if everything is correct
-        if (self.first_name == "" || self.last_name == "") {
-          this.$router.push({ name: 'register' })
-        }
+        console.log(this.token)
 
-        this.email = self.email
-        this.streak = self.streak
-        
-        // Check if they are already enrolled in a cohort for this module
-        this.existingCohort = await getSelfActiveCohort(this.token)
-        await this.retrieveLearnerTabData()
+        // set the localstorage
+        localStorage.setItem("FB_TOKEN", this.token)
+        localStorage.setItem("EMAIL", user.email)
 
         this.loading = false
       } else {
@@ -157,43 +138,20 @@ export default {
       }
     })
   },
+  beforeDestroy() {
+    this.unsubAuth()
+  },
   methods: {
-    retrieveLearnerTabData: async function() {
-      if (this.existingCohort != null) {
-        // Get today's lecture if any
-        this.todayLecture = await getLectureToday(this.token)
-
-        // Get all the upcoming tutorials
-        this.upcomingTutorials = await getUpcomingTutorials(this.token, this.existingCohort.module)
-        if(this.upcomingTutorials.length != 0) {
-          this.upcomingTutorials.sort((a,b) => {
-            let d1 = new Date(a.scheduled_time)
-            let d2 = new Date(b.scheduled_time)
-
-            return d1 - d2
-          })
-        }
-      } else {
-        this.todayLecture = null
-        this.upcomingTutorials = []
-      }
-
-      // Get the daily review if there is one
-      this.dailyReviewCards = await getDailyReview(this.token)
-    },
-    retrieveExploreTabData: async function () {
-      this.modules = await getModules()
-    },
     setActiveTab: async function(tab) {
       if(tab == "Learn") {
         this.openTab = "Learn"
         this.loading = true
-        await this.retrieveLearnerTabData()
+        // Functions go here
         this.loading = false
       } else if (tab == "Explore") {
         this.openTab = "Explore"
         this.loading = true
-        await this.retrieveExploreTabData()
+        // Functions go here
         this.loading = false
       } else {
         return 
@@ -202,13 +160,6 @@ export default {
     logout: async function() {
       this.loading = true
       await firebase.auth().signOut();
-      this.$router.push({ name: "login" })
-    },
-    moduleOpen: function (module) {
-      this.$router.push({name: 'module', params: { module: module }})
-    },
-    activeLecturesOpen() {
-      this.$router.push({ name: 'lectures', params: { module: this.existingCohort.module }})
     },
   },
 }

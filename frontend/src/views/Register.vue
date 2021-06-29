@@ -25,7 +25,7 @@
 <script>
 import { BeatLoader } from '@saeris/vue-spinners'
 
-import { updateSelf } from "../services/LearnerService.js"
+import { createSelf } from "../services/LearnerService.js"
 
 import firebase from "firebase/app";
 import "firebase/auth";
@@ -38,6 +38,7 @@ export default {
   data: function() {
     return {
       token: "",
+      email: "",
       loading: false,
       timezone: "",
       currentTime: "",
@@ -47,23 +48,26 @@ export default {
     }
   },
   created () {
-    firebase.auth().onAuthStateChanged(async (user) => {
-      if (user) {
-        this.token = await user.getIdToken(true)
-        this.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    this.token = localStorage.getItem('FB_TOKEN');
+    this.email = localStorage.getItem('EMAIL');
+    this.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
-        let opts = {
-          hour: 'numeric',
-          minute:'2-digit',
-          timeZone: this.timezone,
-          timeZoneName: 'long'
-        }
-        this.currentTime = new Date().toLocaleString('en', opts) 
-        setInterval(function(){ this.currentTime = new Date().toLocaleString('en', opts) }, 1000); 
-      } else {
-        this.$router.push({ name: 'login' })
-      }
-    })
+    // Someone is messing with us
+    if (this.token == null || this.email == null) {
+      localStorage.removeItem('FB_TOKEN')
+      localStorage.removeItem('EMAIL')
+      this.$router.push({ name: 'login' })
+    }
+
+    let opts = {
+      hour: 'numeric',
+      minute:'2-digit',
+      timeZone: this.timezone,
+      timeZoneName: 'long'
+    }
+
+    this.currentTime = new Date().toLocaleString('en', opts) 
+    setInterval(function(){ this.currentTime = new Date().toLocaleString('en', opts) }, 1000); 
   },
   methods: {
     async registerAccount() {
@@ -76,9 +80,15 @@ export default {
         return
       }
       try {
-        await updateSelf(this.token, this.firstName, this.lastName, this.timezone)
-        this.$router.push({ name: 'home' })
-        this.loading = false
+        let rawResponse = await createSelf(this.token, this.email, this.firstName, this.lastName, this.timezone)
+
+        if (rawResponse.data.addLearner.learner[0].email != null) {
+          this.$router.push({ name: 'home' })
+        } else {
+          this.errorText = "We can't register you right now, try again later!"
+          await firebase.auth().signOut();
+          this.loading = false
+        }
       } catch (err) {
         console.log(err)
         this.errorText = "We can't register you right now, try again later!"

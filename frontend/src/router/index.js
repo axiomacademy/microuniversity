@@ -40,16 +40,6 @@ const routes = [
     name: 'lectures',
     component: () => import(/* webpackChunkName: "lectures" */ '../views/Lectures.vue'),
   },
-  {
-    path: '/module',
-    name: 'module',
-    component: () => import(/* webpackChunkName: "module" */ '../views/Module.vue'),
-  },
-  {
-    path: '/modules',
-    name: 'modules',
-    component: () => import(/* webpackChunkName: "modules" */ '../views/Modules.vue'),
-  }
 ]
 
 const router = new VueRouter({

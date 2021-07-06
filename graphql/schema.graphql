@@ -320,13 +320,13 @@ type Mutation {
   })
 
   completeChallenge(id: ID!): [Tutorial!]! @custom(http: {
-    url: "http://10.114.10.86:8003/api/v0.3/challenge/complete?challengeId=$id"
+    url: "http://192.168.10.139:8003/api/v0.3/challenge/complete?challengeId=$id"
     method: "POST",
     forwardHeaders: ["Authorization"]
   })
   
   enrollTutorial(id: ID!): Boolean @custom(http: {
-    url: "http://10.114.10.86:8003/api/v0.3/tutorial/enroll?tutorialId=$id"
+    url: "http://192.168.10.139:8003/api/v0.3/tutorial/enroll?tutorialId=$id"
     method: "POST",
     forwardHeaders: ["Authorization"]
   })

@@ -137,7 +137,7 @@ func enrollTutorial(w http.ResponseWriter, r *http.Request) {
 		}
 	`
 
-	resp, err := txn.QueryWithVars(r.Context(), checkIfTutorialUnlocked, map[string]string{
+	resp, err = txn.QueryWithVars(r.Context(), checkIfTutorialUnlocked, map[string]string{
 		"$tutorialId": tutorialId,
 	})
 	if err != nil {
@@ -221,7 +221,7 @@ func enrollTutorial(w http.ResponseWriter, r *http.Request) {
 
 	req := &api.Request{Mutations: []*api.Mutation{mu, mu1}}
 
-	_, err := txn.Do(r.Context(), req)
+	_, err = txn.Do(r.Context(), req)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -255,6 +255,7 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 	query checkIfChallengeComplete($challengeId: string, $learnerId: string) {
 			checkIfChallengeComplete(func: uid($learnerId)) {
 				Learner.challenges @filter(uid($challengeId)) {
+					uid
 					LearnerChallenge.status
 					LearnerChallenge.challenge {
 						Challenge.unlocksTutorials {
@@ -285,7 +286,9 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var decode struct {
-		CheckIfChallengeComplete []LearnerChallenge
+		CheckIfChallengeComplete []struct {
+			Challenges []LearnerChallenge `json:"Learner.challenges"`
+		}
 	}
 
 	if err := json.Unmarshal(resp.GetJson(), &decode); err != nil {
@@ -294,27 +297,32 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(decode.CheckIfChallengeComplete) != 1 {
+	if len(decode.CheckIfChallengeComplete[0].Challenges) != 1 {
 		fmt.Println("Oops")
 		http.Error(w, "oops", http.StatusInternalServerError)
 		return
 	}
 
-	if decode.CheckIfChallengeComplete[0].Status == "COMPLETED" {
+	if decode.CheckIfChallengeComplete[0].Challenges[0].Status == "COMPLETED" {
 		fmt.Println("Already complete")
 		http.Error(w, "Already complete", http.StatusBadRequest)
 		return
 	}
 
 	// Set challenge to completed
-	decode.CheckIfChallengeComplete[0].Status = "COMPLETED"
+	update := LearnerChallenge{
+		Uid:    challengeId,
+		Status: "COMPLETED",
+	}
 
-	updateChallenge, err := json.Marshal(decode.CheckIfChallengeComplete[0])
+	updateChallenge, err := json.Marshal(update)
 	if err != nil {
 		fmt.Println(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	fmt.Println(string(updateChallenge))
 
 	mu := &api.Mutation{
 		SetJson: updateChallenge,
@@ -338,7 +346,8 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 			}
   
 			getLearnerChallenges(func: uid($learnerId)) {
-				Learner.challenges @filter(uid_in(LearnerChallenge.challenge, uid(A)) AND eq(LearnerChallenge.status, "DONE")) {
+				uid
+				Learner.challenges @filter(uid_in(LearnerChallenge.challenge, uid(A)) AND eq(LearnerChallenge.status, "COMPLETED")) {
 					uid
 					LearnerChallenge.challenge {
 						uid
@@ -349,10 +358,11 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 		}
 	`
 
-	tutorials := decode.CheckIfChallengeComplete[0].Challenge.UnlocksTutorials
+	tutorials := decode.CheckIfChallengeComplete[0].Challenges[0].Challenge.UnlocksTutorials
 	var unlockedTutorials []Tutorial
 
 	for _, tutorial := range tutorials {
+		fmt.Println(tutorial.Uid)
 		resp, err := txn.QueryWithVars(r.Context(), getTutorialUnlocked, map[string]string{
 			"$tutorialId": tutorial.Uid,
 			"$learnerId":  luid,
@@ -362,6 +372,8 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		fmt.Println(resp)
 
 		var decode1 struct {
 			GetLearnerChallenges []Learner
@@ -373,6 +385,8 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		fmt.Println(decode1)
+
 		if len(decode1.GetLearnerChallenges) != 1 {
 			fmt.Println("Oops")
 			http.Error(w, "oops", http.StatusInternalServerError)
@@ -381,6 +395,9 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 
 		completedCount := len(decode1.GetLearnerChallenges[0].Challenges)
 		unlockCount := len(tutorial.RequiredChallenges)
+
+		fmt.Println(completedCount)
+		fmt.Println(unlockCount)
 
 		// Then we're ready to unlock
 		if completedCount == unlockCount {
@@ -431,8 +448,6 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	fmt.Println(string(dres))
 
 	w.Write(dres)
 }

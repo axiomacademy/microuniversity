@@ -65,9 +65,15 @@ func main() {
 	auth.HandleFunc("/review/card/pass", passReviewCard).Methods("POST", "OPTIONS")
 	auth.HandleFunc("/review/card/fail", failReviewCard).Methods("POST", "OPTIONS")
 
+	// Challenge handlers
 	auth.HandleFunc("/challenge/complete", completeChallenge).Methods("POST", "OPTIONS")
 
+	// Tutorial handlers
 	auth.HandleFunc("/tutorial/enroll", enrollTutorial).Methods("POST", "OPTIONS")
+
+	// Game handlers
+	auth.HandleFunc("/planet/goto", gotoPlanet).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/starsystem/goto", gotoStarsystem).Methods("POST", "OPTIONS")
 
 	// Enabling middlewares
 	r.Use(corsMiddleware)
@@ -75,6 +81,17 @@ func main() {
 
 	log.Print("All setup running, and available on port 8003")
 	log.Fatal(http.ListenAndServe(":8003", r))
+}
+
+/************************* GAME HANDLERS ************************************/
+func gotoPlanet(w http.ResponseWriter, r *http.Request) {
+	// function stub
+	return
+}
+
+func gotoStarsystem(w http.ResponseWriter, r *http.Request) {
+	// function stub
+	return
 }
 
 /************************* TUTORIAL HANDLERS ************************************/

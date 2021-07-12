@@ -29,6 +29,11 @@ type Learner @auth(
   unlockedTutorials: [Tutorial!]!
   activeCohorts: [TutorialCohort!]!
 
+  # Gamification Elements
+  currentPlanet: Planet!
+  energy: Int!
+  coins: Int!
+
   recommendedLectures: [Lecture!]! @custom(http: {
     url: "http://192.168.10.139:8003/api/v0.3/lecture/recommended"
     method: "GET",
@@ -41,6 +46,47 @@ type Learner @auth(
     body: "{ email: $email }",
     forwardHeaders: ["Authorization"]
   })
+}
+
+type Planet @generate(
+  query: {
+    get: false,
+    query: false,
+    aggregate: false,
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false,
+  }
+  subscription: false
+)
+{
+  id: ID!
+  name: String!
+  totalKnowledge: Int!
+  minedKnowledge: Int!
+  reward: Int!
+  completed: Boolean!
+}
+
+type StarSystem @generate(
+    get: false,
+    query: false,
+    aggregate: false,
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false,
+  }
+  subscription: false
+)
+{
+  id: ID!
+  name: String!
+  planets: [Planet!]!
+  nearbySystems: [StarSystem!]!
 }
 
 # Organising the content
@@ -78,6 +124,7 @@ type Topic @generate(
 {
   id: ID!
   name: String!
+  label: String! @search(by: [exact])
 
   subject: Subject!
   preReqs: [Topic!]! @hasInverse(field: postReqs)
@@ -100,6 +147,7 @@ type Lecture @generate (
 {
   id: ID!
   title: String!
+  label: String! @search(by: [exact])
   description: String!
   videoLink: String
 
@@ -133,6 +181,7 @@ type Tutorial @generate(
 {
   id: ID!
   title: String!
+  label: String! @search(by: [exact])
   description: String!
 
   requiredChallenges: [Challenge!]! @hasInverse(field: unlocksTutorials)
@@ -242,6 +291,7 @@ type Challenge @generate(
 {
   id: ID!
   title: String!
+  label: String! @search(by: [exact])
   description: String!
   
   requiredLectures: [Lecture!]! @hasInverse(field: unlocksChallenges)

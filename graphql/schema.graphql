@@ -88,7 +88,7 @@ type StarSystem @generate(
 {
   id: ID!
   name: String!
-  planets: [Planet!]!
+  planets: [Planet!]! @hasInverse(field: starSystem)
   nearbySystems: [StarSystem!]!
 }
 

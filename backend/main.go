@@ -28,6 +28,14 @@ var DB_URL string
 var fb *firebase.App
 var c *dgo.Dgraph
 
+// Constants
+const PLANET_ENERGY_DEPLETION int = 100
+const STARSYSTEM_ENERGY_DEPLETION int = 100
+const CHALLENGE_ENERGY_DEPLETION int = 100
+const TUTORIAL_ENERGY_DEPLETION int = 100
+const LECTURE_ENERGY_DEPLETION int = 100
+const CHALLENGE_KNOWLEDGE int = 100
+
 func main() {
 	fmt.Println("Server initialising...")
 
@@ -56,7 +64,7 @@ func main() {
 	auth := r.PathPrefix("/api/v0.3").Subrouter()
 
 	// Lecture handlers
-	auth.HandleFunc("/lecture/complete", completeLecture).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/lecture/complete", completeLecture).Methods("POST", "OPTIONS") // Deplete energy
 	auth.HandleFunc("/lecture/recommended", recommendedLectures).Methods("GET", "OPTIONS")
 
 	// Review handlers
@@ -66,14 +74,15 @@ func main() {
 	auth.HandleFunc("/review/card/fail", failReviewCard).Methods("POST", "OPTIONS")
 
 	// Challenge handlers
-	auth.HandleFunc("/challenge/complete", completeChallenge).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/challenge/accept", acceptChallenge).Methods("POST", "OPTIONS")     // Depletes energy
+	auth.HandleFunc("/challenge/complete", completeChallenge).Methods("POST", "OPTIONS") // Mines knowledge
 
 	// Tutorial handlers
-	auth.HandleFunc("/tutorial/enroll", enrollTutorial).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/tutorial/enroll", enrollTutorial).Methods("POST", "OPTIONS") // Depletes energy
 
 	// Game handlers
-	auth.HandleFunc("/planet/goto", gotoPlanet).Methods("POST", "OPTIONS")
-	auth.HandleFunc("/starsystem/goto", gotoStarsystem).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/planet/goto", gotoPlanet).Methods("POST", "OPTIONS")         // Deplete Energy
+	auth.HandleFunc("/starsystem/goto", gotoStarsystem).Methods("POST", "OPTIONS") // Deplete Energy
 
 	// Enabling middlewares
 	r.Use(corsMiddleware)
@@ -85,23 +94,238 @@ func main() {
 
 /************************* GAME HANDLERS ************************************/
 func gotoPlanet(w http.ResponseWriter, r *http.Request) {
-	// function stub
+	luid := r.Header.Get("X-Uid-Claim")
+	energy := r.Header.Get("X-Energy-Claim")
+
+	query := r.URL.Query()
+	planetId := query.Get("planetId")
+
+	if planetId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Calculate energy depletion
+	if e := energy - PLANET_ENERGY_DEPLETION; e >= 0 {
+		energy = e
+	} else {
+		fmt.Println("Not enough energy")
+		http.Error(w, "Not enough energy", http.StatusBadRequest)
+		return
+	}
+
+	// Make sure the planet is visitable
+	const checkPlanetNearby = `
+		query checkPlanetNearby($planetId: string, $learnerId: string) {
+			checkPlanetNearby(func: uid($learnerId)) @cascade {
+				Learner.currentPlanet @cascade {
+					Planet.starSystem @cascade {
+						StarSystem.planets @filter(uid($planetId)) {
+							uid
+						}
+					}
+				}
+			}
+		}
+	`
+
+	txn := c.NewTxn()
+	defer txn.Discard(r.Context())
+
+	resp, err := txn.QueryWithVars(r.Context(), checkPlanetNearby, map[string]string{
+		"$planetId":  planetId,
+		"$learnerId": luid,
+	})
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var d struct {
+		CheckPlanetNearby []Learner
+	}
+
+	if err := json.Unmarshal(resp.GetJson(), &d); err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// If there's nothing means it's not nearby
+	if len(d.CheckPlanetNearby) == 0 {
+		fmt.Println("Planet not nearby")
+		http.Error(w, "Planet not nearby", http.StatusBadRequest)
+		return
+	}
+
+	l := Learner{
+		Uid:    luid,
+		Energy: energy,
+		CurrentPlanet: Planet{
+			Uid: planetId,
+		},
+	}
+
+	pl, err := json.Marshal(l)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	mu := &api.Mutation{
+		SetJson: pl,
+	}
+
+	_, err = txn.Mutate(r.Context(), mu)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	/*
+		err = txn.Commit(r.Context())
+		if err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	*/
+
 	return
 }
 
 func gotoStarsystem(w http.ResponseWriter, r *http.Request) {
-	// function stub
+	luid := r.Header.Get("X-Uid-Claim")
+	energy := r.Header.Get("X-Energy-Claim")
+
+	query := r.URL.Query()
+	planetId := query.Get("planetId")
+
+	if planetId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Calculate energy depletion
+	if e := energy - STARSYSTEM_ENERGY_DEPLETION; e >= 0 {
+		energy = e
+	} else {
+		fmt.Println("Not enough energy")
+		http.Error(w, "Not enough energy", http.StatusBadRequest)
+		return
+	}
+
+	// Make sure the planet is visitable
+	const checkSystemNearby = `
+query checkPlanetNearby($systemId: string, $planetId: string, $learnerId: string) {
+			checkPlanetNearby(func: uid($learnerId)) @cascade {
+				Learner.currentPlanet @cascade {
+					Planet.starSystem @cascade {
+						StarSystem.nearbySystems @cascade {
+							uid
+							StarSystem.name
+							StarSystem.planets @filter(uid($planetId)) {
+								uid
+							}
+						}
+					}
+				}
+			}
+		}
+	`
+
+	txn := c.NewTxn()
+	defer txn.Discard(r.Context())
+
+	resp, err := txn.QueryWithVars(r.Context(), checkSystemNearby, map[string]string{
+		"$systemId":  systemId,
+		"$planetId":  planetId,
+		"$learnerId": luid,
+	})
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var d struct {
+		CheckSystemNearby []Learner
+	}
+
+	if err := json.Unmarshal(resp.GetJson(), &d); err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// If there's nothing means it's not nearby
+	if len(d.CheckSystemNearby) == 0 {
+		fmt.Println("System not nearby")
+		http.Error(w, "System not nearby", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: generate planets and systems programatically
+
+	l := Learner{
+		Uid:    luid,
+		Energy: energy,
+		CurrentPlanet: Planet{
+			Uid: planetId,
+		},
+	}
+
+	pl, err := json.Marshal(l)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	mu := &api.Mutation{
+		SetJson: pl,
+	}
+
+	_, err = txn.Mutate(r.Context(), mu)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	/*
+		err = txn.Commit(r.Context())
+		if err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	*/
 	return
 }
 
 /************************* TUTORIAL HANDLERS ************************************/
 func enrollTutorial(w http.ResponseWriter, r *http.Request) {
 	luid := r.Header.Get("X-Uid-Claim")
+	energy := r.Header.Get("X-Energy-Claim")
+
 	query := r.URL.Query()
 	tutorialId := query.Get("tutorialId")
 
 	if tutorialId == "" {
 		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Calculate energy depletion
+	if e := energy - TUTORIAL_ENERGY_DEPLETION; e >= 0 {
+		energy = e
+	} else {
+		fmt.Println("Not enough energy")
+		http.Error(w, "Not enough energy", http.StatusBadRequest)
 		return
 	}
 
@@ -208,7 +432,8 @@ func enrollTutorial(w http.ResponseWriter, r *http.Request) {
 	}
 
 	l := Learner{
-		Uid: luid,
+		Uid:    luid,
+		Energy: energy,
 		ActiveCohorts: []TutorialCohort{
 			tc,
 		},
@@ -240,7 +465,9 @@ func enrollTutorial(w http.ResponseWriter, r *http.Request) {
 
 	_, err = txn.Do(r.Context(), req)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	/*
@@ -249,7 +476,8 @@ func enrollTutorial(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
-		}*/
+		}
+	*/
 
 	w.Write([]byte("true"))
 	return
@@ -257,8 +485,134 @@ func enrollTutorial(w http.ResponseWriter, r *http.Request) {
 }
 
 /************************* CHALLENGE HANDLERS ***********************************/
+func acceptChallenge(w http.ResponseWriter, r *http.Request) {
+	luid := r.Header.Get("X-Uid-Claim")
+	energy := r.Header.Get("X-Energy-Claim")
+
+	query := r.URL.Query()
+	challengeId := query.Get("challengeId")
+
+	if challengeId == "" {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Calculate energy depletion
+	if e := energy - CHALLENGE_ENERGY_DEPLETION; e >= 0 {
+		energy = e
+	} else {
+		fmt.Println("Not enough energy")
+		http.Error(w, "Not enough energy", http.StatusBadRequest)
+		return
+	}
+
+	const checkChallengeStatus = `
+		query checkIfChallengeComplete($challengeId: string, $learnerId: string) {
+			checkIfChallengeComplete(func: uid($learnerId)) {
+				Learner.challenges @filter(uid($challengeId)) {
+					uid
+					LearnerChallenge.status
+				}
+			}
+		}
+	`
+
+	txn := c.NewTxn()
+	defer txn.Discard(r.Context())
+
+	resp, err := txn.QueryWithVars(r.Context(), checkChallengeStatus, map[string]string{
+		"$challengeId": challengeId,
+		"$learnerId":   luid,
+	})
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var decode struct {
+		CheckChallengeStatus []struct {
+			Challenges []LearnerChallenge `json:"Learner.challenges"`
+		}
+	}
+
+	if err := json.Unmarshal(resp.GetJson(), &decode); err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if len(decode.CheckChallengeStatus[0].Challenges) != 1 {
+		fmt.Println("Oops")
+		http.Error(w, "oops", http.StatusInternalServerError)
+		return
+	}
+
+	if decode.CheckChallengeStatus[0].Challenges[0].Status != "UNLOCKED" {
+		fmt.Println("Incorrect status")
+		http.Error(w, "Incorrect status", http.StatusBadRequest)
+		return
+	}
+
+	// Set challenge to inprogress
+	update := LearnerChallenge{
+		Uid:    challengeId,
+		Status: "INPROGRESS",
+	}
+
+	updateChallenge, err := json.Marshal(update)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println(string(updateChallenge))
+
+	mu := &api.Mutation{
+		SetJson: updateChallenge,
+	}
+
+	updateLearner := Learner{
+		Uid:    luid,
+		Energy: energy,
+	}
+
+	pl, err := json.Marshal(updateLearner)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	mu1 := &api.Mutation{
+		SetJson: pl,
+	}
+
+	req := &api.Request{Mutations: []*api.Mutation{mu, mu1}}
+	_, err := txn.Do(r.Context(), req)
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	/*
+		err = txn.Commit(r.Context())
+		if err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	*/
+
+	return
+}
+
 func completeChallenge(w http.ResponseWriter, r *http.Request) {
 	luid := r.Header.Get("X-Uid-Claim")
+	lcoins := r.Header.Get("X-Coins-Claim")
+
 	query := r.URL.Query()
 	challengeId := query.Get("challengeId")
 
@@ -271,6 +625,11 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 	const checkIfChallengeComplete = `
 	query checkIfChallengeComplete($challengeId: string, $learnerId: string) {
 			checkIfChallengeComplete(func: uid($learnerId)) {
+				Learner.currentPlanet {
+					uid
+					Planet.totalKnowledge
+					Planet.minedKnowledge
+					Planet.reward
 				Learner.challenges @filter(uid($challengeId)) {
 					uid
 					LearnerChallenge.status
@@ -317,6 +676,16 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 	if len(decode.CheckIfChallengeComplete[0].Challenges) != 1 {
 		fmt.Println("Oops")
 		http.Error(w, "oops", http.StatusInternalServerError)
+		return
+	}
+
+	// Pull out current planet details
+	currentPlanet := decode.CheckIfChallengeComplete[0].CurrentPlanet
+
+	// Check if planet has already been completely mined
+	if currentPlanet.Completed {
+		fmt.Println("Already mined planet")
+		http.Error(w, "Already mined planet", http.StatusBadRequest)
 		return
 	}
 
@@ -422,10 +791,24 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Check currrent planet mining levels
+	mineLevel := currentPlanet.MinedKnowledge + CHALLENGE_KNOWLEDGE
+	if mineLevel < currentPlanet.TotalKnowledge {
+		currentPlanet.MinedKnowledge = mineLevel
+	} else {
+		currentPlanet.MinedKnowledge = currentPlanet.totalKnowledge
+		currentPlanet.Completed = true
+	}
+
 	// Add unlocked tutorials
 	l := Learner{
 		Uid:               luid,
 		UnlockedTutorials: unlockedTutorials,
+		CurrentPlanet:     currentPlanet,
+	}
+
+	if currentPlanet.Completed {
+		l.Coins = lcoins + currentPlanet.reward
 	}
 
 	pl, err := json.Marshal(l)
@@ -446,13 +829,12 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	/*
-		err = txn.Commit(r.Context())
-		if err != nil {
-			fmt.Println(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}*/
+	err = txn.Commit(r.Context())
+	if err != nil {
+		fmt.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	var gqlTutorials []GqlTutorial
 
@@ -1035,8 +1417,11 @@ func recommendedLectures(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+/***************************** LECTURE HANDLERS **************************************/
+
 func completeLecture(w http.ResponseWriter, r *http.Request) {
 	luid := r.Header.Get("X-Uid-Claim")
+	energy := r.Header.Get("X-Energy-Claim")
 
 	query := r.URL.Query()
 	lectureId := query.Get("lectureId")
@@ -1046,10 +1431,19 @@ func completeLecture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Calculate energy depletion
+	if e := energy - LECTURE_ENERGY_DEPLETION; e >= 0 {
+		energy = e
+	} else {
+		fmt.Println("Not enough energy")
+		http.Error(w, "Not enough energy", http.StatusBadRequest)
+		return
+	}
+
 	// Check if lecture is already complete
-	const checkIfLectureComplete = `
-		query checkIfLectureComplete($lectureId: string, $learnerId: string) {
-			checkIfLectureComplete(func: uid($learnerId)) @cascade {
+	const getLearner = `
+		query getLearner($lectureId: string, $learnerId: string) {
+			getLearner(func: uid($learnerId)) @cascade {
 				uid
 				Learner.completedLectures @filter(uid($lectureId)) {}
 			}
@@ -1059,7 +1453,7 @@ func completeLecture(w http.ResponseWriter, r *http.Request) {
 	txn := c.NewTxn()
 	defer txn.Discard(r.Context())
 
-	resp, err := txn.QueryWithVars(r.Context(), checkIfLectureComplete, map[string]string{
+	resp, err := txn.QueryWithVars(r.Context(), getLearner, map[string]string{
 		"$lectureId": lectureId,
 		"$learnerId": luid,
 	})
@@ -1071,7 +1465,7 @@ func completeLecture(w http.ResponseWriter, r *http.Request) {
 
 	// Decode
 	var d struct {
-		CheckIfLectureComplete []Learner
+		GetLearner []Learner
 	}
 
 	if err := json.Unmarshal(resp.GetJson(), &d); err != nil {
@@ -1081,7 +1475,7 @@ func completeLecture(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If there's nothing means it's incomplete
-	if len(d.CheckIfLectureComplete) > 0 {
+	if len(d.GetLearner) != 0 {
 		fmt.Println("Already complete")
 		http.Error(w, "Already complete", http.StatusBadRequest)
 		return
@@ -1174,7 +1568,7 @@ func completeLecture(w http.ResponseWriter, r *http.Request) {
 				DType:     []string{"LearnerChallenge"},
 				Learner:   Learner{Uid: luid},
 				Challenge: Challenge{Uid: challenge.Uid},
-				Status:    "INPROGRESS",
+				Status:    "UNLOCKED",
 			}
 
 			pc, err := json.Marshal(c)
@@ -1221,7 +1615,9 @@ func completeLecture(w http.ResponseWriter, r *http.Request) {
 		req := &api.Request{Mutations: mList}
 		_, err := txn.Do(r.Context(), req)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -1281,6 +1677,7 @@ func completeLecture(w http.ResponseWriter, r *http.Request) {
 	// Adding the reverse edges
 	l := Learner{
 		Uid:        luid,
+		Energy:     energy,
 		Cards:      d2.LearnerReviewCards,
 		Challenges: d2.LearnerChallenges,
 		CompletedLectures: []Lecture{{
@@ -1389,6 +1786,8 @@ func authMiddleware(next http.Handler) http.Handler {
 			query userUid($email: string) {
 					userUid(func: eq(Learner.email, $email)) {
 						uid
+						Learner.coins
+						Learner.energy
 					}
 			}
 		`
@@ -1406,7 +1805,9 @@ func authMiddleware(next http.Handler) http.Handler {
 
 		var decode struct {
 			UserUid []struct {
-				Uid string
+				Uid    string
+				Coins  int `json:"Learner.coins,omitempty"`
+				Energy int `json:"Learner.energy,omitempty"`
 			}
 		}
 
@@ -1419,6 +1820,8 @@ func authMiddleware(next http.Handler) http.Handler {
 
 		r.Header.Set("X-User-Claim", email)
 		r.Header.Set("X-Uid-Claim", decode.UserUid[0].Uid)
+		r.Header.Set("X-Coins-Claim", decode.UserUid[0].Coins)
+		r.Header.Set("X-Energy-Claim", decode.UserUid[0].Energy)
 		next.ServeHTTP(w, r)
 	})
 }

@@ -28,6 +28,7 @@ type Learner @auth(
   challenges: [LearnerChallenge!]! @hasInverse(field: learner)
   unlockedTutorials: [Tutorial!]!
   activeCohorts: [TutorialCohort!]!
+  masteredTopics: [Topic!]!
 
   # Gamification Elements
   currentPlanet: Planet!
@@ -68,9 +69,11 @@ type Planet @generate(
   minedKnowledge: Int!
   reward: Int!
   completed: Boolean!
+  starSystem: StarSystem!
 }
 
 type StarSystem @generate(
+  query: {
     get: false,
     query: false,
     aggregate: false,
@@ -270,7 +273,7 @@ type LearnerReviewCard
 
 # Challenge
 enum ChallengeStatus {
-  WAITING
+  UNLOCKED
   INPROGRESS
   COMPLETED
 }

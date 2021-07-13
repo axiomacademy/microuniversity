@@ -64,7 +64,12 @@ type TutorialCohort struct {
 }
 
 type Learner struct {
-	Uid               string              `json:"uid,omitempty"`
+	Uid string `json:"uid,omitempty"`
+
+	Energy        int    `json:"Learner.energy,omitempty"`
+	Coins         int    `json:"Learner.coins,omitempty"`
+	CurrentPlanet Planet `json:"Learner.currentPlanet,omitempty"`
+
 	Cards             []LearnerReviewCard `json:"Learner.cards,omitempty"`
 	Challenges        []LearnerChallenge  `json:"Learner.challenges,omitempty"`
 	LastCompleted     time.Time           `json:"Learner.lastCompleted,omitempty"`
@@ -77,6 +82,22 @@ func (l *Learner) toGql() GqlLearner {
 	return GqlLearner{
 		Id: l.Uid,
 	}
+}
+
+type Planet struct {
+	Uid            string     `json:"uid,omitempty"`
+	StarSystem     StarSystem `json:"Planet.starSystem,omitempty"`
+	TotalKnowledge int        `json:"Planet.totalKnowledge,omitempty"`
+	MinedKnowledge int        `json:"Planet.minedoKnowledge,omitempty"`
+	Reward         int        `json:"Planet.reward,omitempty"`
+	Completed      bool       `json:"Planet.completed,omitempty"`
+}
+
+type StarSystem struct {
+	Uid           string       `json:"uid,omitempty"`
+	Name          string       `json:"StarSystem.name,omitempty"`
+	Planets       []Planet     `json:"StarSystem.planets,omitempty"`
+	NearbySystems []StarSystem `json:"StarSystem.nearbySystems,omitempty"`
 }
 
 type Lecture struct {

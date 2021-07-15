@@ -1,25 +1,28 @@
 <template>
-  <div id="home" class="wrapper bg-purple-50 min-h-screen flex flex-col pb-32 items-center" v-bind:class="{ 'game': exploreTabOpen }"> 
+  <div id="home" class="wrapper bg-purple-50 min-h-screen flex flex-col pb-24" v-bind:class="{ 'game': exploreTabOpen }"> 
 
-    <div v-if="!loading" class="lg:w-6/12 w-full">
+    <div v-if="!loading" class="lg:w-6/12 w-full flex-grow flex flex-col">
 
       <div v-if="openTab == 'Explore'" id="explore-tab">
         EXPLORE
       </div>
       
-      <div v-if="openTab == 'Challenges'" id="learn-tab" class="py-10">
-        <h1 class="text-3xl font-display font-bold max-w-0 px-10 text-secondary">Mining Activities</h1>
-        <div class="px-4 py-4 mt-6">
+      <div v-if="openTab == 'Challenges'" id="learn-tab" class="pt-10 flex-grow">
+        <h1 class="text-3xl font-bold max-w-0 px-10 text-secondary">Mining Activities</h1>
+        <div class="px-4 pt-4">
           <DailyReviewCard :dailyReviewCards="dailyReviewCards" />
         </div>
-        <h2 class="text-xl font-body font-bold mt-8 mb-2 px-10 text-text">Challenges</h2>
-        <h2 class="text-xl font-body font-bold mt-8 mb-2 px-10 text-text">Tutorials</h2>
+
+        <h2 class="text-2xl font-semibold mt-6 mb-3 px-10 text-text">Challenges</h2>
+        <ChallengeStatus v-for="challenge in challenges" :key="challenge.title" :challenge="challenge" class="mx-4" />
+
+        <h2 class="text-2xl font-semibold mt-6 mb-3 px-10 text-text">Tutorials</h2>
+        <TutorialStatus v-for="tutorial in tutorials" :key="tutorial.title" :tutorial="tutorial" class="mx-4" />
       </div>
       
-      <div v-if="openTab == 'Learn'" id="learn-tab" class="py-10">
+      <div v-if="openTab == 'Learn'" id="learn-tab" class="pt-10 flex-grow flex flex-col justify-center">
         <h1 class="text-3xl font-display font-bold max-w-0 px-10 text-secondary">Gather Knowledge</h1>
-        <h2 class="text-xl font-body font-bold mt-6 px-10 text-text">Recommendations</h2>
-        <div class="overflow-x-auto flex flex-nowrap mt-4 pl-4 horizontal">
+        <div class="overflow-x-auto flex flex-nowrap my-auto pl-4 h-full horizontal">
           <LectureCard v-for="lecture in lectures" :key="lecture.title" :lecture="lecture" :token="token" class="lectureCard" />
         </div>
       </div>
@@ -63,6 +66,8 @@ import { MoonLoader } from '@saeris/vue-spinners'
 
 import LectureCard from '../components/LectureCard.vue'
 import DailyReviewCard from '../components/DailyReviewCard.vue'
+import TutorialStatus from '../components/TutorialStatus.vue'
+import ChallengeStatus from '../components/ChallengeStatus.vue'
 
 import firebase from "firebase/app";
 import "firebase/auth";
@@ -73,6 +78,8 @@ export default {
     MoonLoader,
     LectureCard,
     DailyReviewCard,
+    TutorialStatus,
+    ChallengeStatus,
   },
   data: function () {
     return {
@@ -82,6 +89,20 @@ export default {
       openTab: "Learn",
       unsubAuth: null,
       dailyReviewCards: [],
+      challenges: [
+        {
+          title: "Build a full adder",
+          subject: "Computer Science",
+          description: "Run through the process of designing a basic 8-bit CPU in a team of three",
+        },
+      ],
+      tutorials: [
+        {
+          title: "Designing a 8-bit CPU",
+          status: "ENROLLED",
+          description: "Run through the process of designing a basic 8-bit CPU in a team of three",
+        },
+      ],
       lectures: [
         {
           title: "Electronic Computing",

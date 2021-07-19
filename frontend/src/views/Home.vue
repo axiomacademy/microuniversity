@@ -1,10 +1,36 @@
 <template>
-  <div id="home" class="wrapper bg-purple-50 min-h-screen flex flex-col pb-24" v-bind:class="{ 'game': exploreTabOpen }"> 
+  <div id="home" class="wrapper bg-purple-50 min-h-screen flex flex-col pb-24"> 
 
     <div v-if="!loading" class="lg:w-6/12 w-full flex-grow flex flex-col">
 
-      <div v-if="openTab == 'Explore'" id="explore-tab">
-        EXPLORE
+      <div v-if="openTab == 'Explore'" id="explore-tab" class="pt-4 flex-grow flex flex-col items-center px-6">
+        <div class="mt-4 mb-8 flex">
+          <Chip class="w-20 mt-1 mr-2">100 🪙</Chip>
+          <Chip class="w-20 mt-1">67% ⚡</Chip>
+        </div>
+        <img src="../assets/planet.png"/>
+        <h1 class="font-display text-3xl mt-4 font-bold">{{ currentPlanet.name }}</h1>
+        <h2 class="font-display text-lg text-secondary">{{ currentPlanet.starSystem.name }}</h2>
+
+        <span class="font-body text-lg text-text mt-4 self-start font-semibold">Mining Status</span>
+        <div class="h-6 mt-2 relative w-full rounded-full overflow-hidden">
+          <div class="w-full h-full bg-purple-100 absolute"></div>
+          <div class="h-full bg-primary absolute" style="width:10%"></div>
+        </div>
+        <div class="shadow-sm p-6 bg-white rounded-md flex items-center w-full mt-8">
+          <img src="../assets/planets.png" class="w-12">
+          <div class="ml-4">
+            <h1 class="font-normal text-text text-lg">Visit another planet</h1>
+            <Chip class="w-20 mt-1">100 🪙</Chip>
+          </div>
+        </div>
+        <div class="shadow-sm p-6 bg-white rounded-md flex items-center w-full mt-2">
+          <img src="../assets/galaxy.png" class="w-12">
+          <div class="ml-4">
+            <h1 class="font-normal text-text text-lg">Visit nearby starsystem</h1>
+            <Chip class="w-20 mt-1">1000 🪙</Chip>
+          </div>
+        </div>
       </div>
       
       <div v-if="openTab == 'Challenges'" id="learn-tab" class="pt-10 flex-grow">
@@ -14,10 +40,17 @@
         </div>
 
         <h2 class="text-2xl font-semibold mt-6 mb-3 px-10 text-text">Challenges</h2>
-        <ChallengeStatus v-for="challenge in challenges" :key="challenge.title" :challenge="challenge" class="mx-4" />
+        <ChallengeStatus v-if="activeChallenge != null" :challenge="activeChallenge" class="mx-4" />
+        <div v-else  class="overflow-x-auto flex flex-nowrap my-auto pl-4 h-full horizontal">
+          <ChallengeAccept v-for="challenge in challenges" :key="challenge.title" :challenge="challenge" class="min-w-50 mr-4" />
+        </div>
+
 
         <h2 class="text-2xl font-semibold mt-6 mb-3 px-10 text-text">Tutorials</h2>
-        <TutorialStatus v-for="tutorial in tutorials" :key="tutorial.title" :tutorial="tutorial" class="mx-4" />
+        <TutorialCohortStatus v-if="enrolledCohort != null" :tutorial="enrolledCohort" class="mx-4" />
+        <div v-else class="overflow-x-auto flex flex-nowrap my-auto pl-4 h-full horizontal">
+          <TutorialEnroll v-for="tutorial in tutorials" :key="tutorial.title" :tutorial="tutorial" class="min-w-50 mr-4" />
+        </div>
       </div>
       
       <div v-if="openTab == 'Learn'" id="learn-tab" class="pt-10 flex-grow flex flex-col justify-center">
@@ -64,9 +97,12 @@
 <script>
 import { MoonLoader } from '@saeris/vue-spinners'
 
+import Chip from '../components/Chip.vue'
 import LectureCard from '../components/LectureCard.vue'
 import DailyReviewCard from '../components/DailyReviewCard.vue'
-import TutorialStatus from '../components/TutorialStatus.vue'
+import TutorialEnroll from '../components/TutorialEnroll.vue'
+import TutorialCohortStatus from '../components/TutorialCohortStatus.vue'
+import ChallengeAccept from '../components/ChallengeAccept.vue'
 import ChallengeStatus from '../components/ChallengeStatus.vue'
 
 import firebase from "firebase/app";
@@ -75,10 +111,13 @@ import "firebase/auth";
 export default {
   name: 'App',
   components: {
+    Chip,
     MoonLoader,
     LectureCard,
     DailyReviewCard,
-    TutorialStatus,
+    TutorialEnroll,
+    TutorialCohortStatus,
+    ChallengeAccept,
     ChallengeStatus,
   },
   data: function () {
@@ -89,18 +128,51 @@ export default {
       openTab: "Learn",
       unsubAuth: null,
       dailyReviewCards: [],
+      currentPlanet: {
+        name: "Venus-256",
+        minedKnowledge: "200",
+        totalKnowledge: "1000",
+        starSystem: {
+          name: "Solar System"
+        }
+      },
+      activeChallenge: null,
       challenges: [
         {
-          title: "Build a full adder",
+          title: "Design a simple logical ciruit",
+          status: "UNLOCKED",
           subject: "Computer Science",
-          description: "Run through the process of designing a basic 8-bit CPU in a team of three",
+          description: "Design a circuit to evaluate any simple logical statement",
+        },
+        {
+          title: "Build a half adder",
+          status: "UNLOCKED",
+          subject: "Computer Science",
+          description: "Using a digital design platform, build a half adder."
+        },
+        {
+          title: "Build a full adder",
+          status: "UNLOCKED",
+          subject: "Computer Science",
+          description: "Using a digital design platform, build a full adder to demonstrate bitwise adding",
         },
       ],
+      enrolledCohort: null /*{
+          title: "Designing a 8-bit CPU",
+          topic: "Computer architecture",
+          status: "ENROLLED",
+          description: "Run through the process of designing a basic 8-bit CPU",
+      }*/,
       tutorials: [
         {
           title: "Designing a 8-bit CPU",
-          status: "ENROLLED",
-          description: "Run through the process of designing a basic 8-bit CPU in a team of three",
+          topic: "Computer architecture",
+          description: "Run through the process of designing a basic 8-bit CPU",
+        },
+        {
+          title: "Python Fractal Generator",
+          topic: "Introduction to Python",
+          description: "Create a Mendelbrot Set using Python to visualise fractals",
         },
       ],
       lectures: [
@@ -179,11 +251,6 @@ export default {
 </script>
 
 <style>
-
-.game {
-  background-image: url("../assets/bg.jpeg");
-}
-
 .horizontal::-webkit-scrollbar {
   display: none;
 }
@@ -197,6 +264,11 @@ export default {
 .lectureCard {
   scroll-snap-align: center;
   min-width: 80vw;
+}
+
+.min-w-50 {
+  scroll-snap-align: center;
+  min-width: 50vw;
 }
 
 </style>

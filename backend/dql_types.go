@@ -138,10 +138,10 @@ func (card *ReviewCard) toGql() GqlReviewCard {
 type LearnerReviewCard struct {
 	Uid        string     `json:"uid,omitempty"`
 	DType      []string   `json:"dgraph.type,omitempty"`
-	Learner    Learner    `json:"LearnerReviewCard.learner"`
-	ReviewCard ReviewCard `json:"LearnerReviewCard.reviewCard"`
-	Selected   time.Time  `json:"LearnerReviewCard.selected"`
-	Repeat     int        `json:"LearnerReviewCard.repeat"`
+	Learner    Learner    `json:"LearnerReviewCard.learner,omitempty"`
+	ReviewCard ReviewCard `json:"LearnerReviewCard.reviewCard,omitempty"`
+	Selected   time.Time  `json:"LearnerReviewCard.selected,omitempty"`
+	Repeat     int        `json:"LearnerReviewCard.repeat,omitempty"`
 }
 
 func (lCard *LearnerReviewCard) toGql() GqlLearnerReviewCard {

@@ -44,7 +44,7 @@ type Learner @auth(
   cards: [LearnerReviewCard!]! @hasInverse(field: learner)
   challenges: [LearnerChallenge!]! @hasInverse(field: learner)
   unlockedTutorials: [Tutorial!]!
-  activeCohorts: [TutorialCohort!]!
+  activeCohort: TutorialCohort
   masteredTopics: [Topic!]!
 
   # Gamification Elements

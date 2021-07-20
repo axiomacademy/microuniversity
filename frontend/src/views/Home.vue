@@ -5,18 +5,18 @@
 
       <div v-if="openTab == 'Explore'" id="explore-tab" class="pt-6 flex-grow flex flex-col items-center px-6">
         <img src="../assets/planet.svg" class="w-8/12"/>
-        <h1 class="font-display text-3xl mt-4 font-bold">{{ currentPlanet.name }}</h1>
-        <h2 class="font-display text-lg text-secondary">{{ currentPlanet.starSystem.name }}</h2>
+        <h1 class="font-display text-3xl mt-4 font-bold">{{ coreData.currentPlanet.planet.name }}</h1>
+        <h2 class="font-display text-lg text-secondary">{{ coreData.currentPlanet.planet.starSystem.name }}</h2>
         
         <div class="mt-2 flex">
-          <Chip class="w-20 mt-1 mr-2">1000 🪙</Chip>
-          <Chip class="w-20 mt-1">100 ⚡</Chip>
+          <Chip class="w-20 mt-1 mr-2">{{ coreData.coins }} 🪙</Chip>
+          <Chip class="w-20 mt-1">{{ coreData.energy }} ⚡</Chip>
         </div>
 
         <span class="font-body text-lg text-text mt-6 self-start font-semibold">Mining Status</span>
         <div class="h-6 mt-2 relative w-full rounded-full overflow-hidden">
           <div class="w-full h-full bg-purple-100 absolute"></div>
-          <div class="h-full bg-primary absolute" style="width:10%"></div>
+          <div class="h-full bg-primary absolute" v-bind:style="progressBarStyle"></div>
         </div>
         <div class="shadow-sm px-6 py-3 bg-white rounded-md flex items-center w-full mt-8">
           <img src="../assets/planets.svg" class="w-12">
@@ -48,16 +48,15 @@
         </div>
 
         <h2 class="text-2xl font-semibold mt-6 mb-3 px-10 text-text">Challenges</h2>
-        <ChallengeStatus v-if="activeChallenge != null" :challenge="activeChallenge" class="mx-4" />
+        <ChallengeStatus v-if="activeChallenge.length != 0" :challenge="activeChallenge[0]" class="mx-4" />
         <div v-else  class="overflow-x-auto flex flex-nowrap my-auto pl-4 h-full horizontal">
-          <ChallengeAccept v-for="challenge in challenges" :key="challenge.title" :challenge="challenge" class="min-w-50 mr-4" />
+          <ChallengeAccept v-for="challenge in testChallenges" :key="challenge.challenge.id" :challenge="challenge" class="min-w-50 mr-4" />
         </div>
 
-
         <h2 class="text-2xl font-semibold mt-6 mb-3 px-10 text-text">Tutorials</h2>
-        <TutorialCohortStatus v-if="enrolledCohort != null" :tutorial="enrolledCohort" class="mx-4" />
+        <TutorialCohortStatus v-if="coreData.activeCohort != null" :tutorial="coreData.activeCohort" class="mx-4" />
         <div v-else class="overflow-x-auto flex flex-nowrap my-auto pl-4 h-full horizontal">
-          <TutorialEnroll v-for="tutorial in tutorials" :key="tutorial.title" :tutorial="tutorial" class="min-w-50 mr-4" />
+          <TutorialEnroll v-for="tutorial in testTutorials" :key="tutorial.id" :tutorial="tutorial" class="min-w-50 mr-4" />
         </div>
       </div>
       
@@ -71,12 +70,12 @@
       
       <div v-if="openTab == 'Me'" id="me-tab" class="pt-10 flex-grow flex flex-col px-8">
         <img src="../assets/spaceship.svg" class="w-6/12"/>
-        <h1 class="font-display text-xl mt-4 font-bold">Sudharshan</h1>
-        <h2 class="font-display text-xl text-text">Sundaramahalingam</h2>
+        <h1 class="font-display text-xl mt-4 font-bold">{{ coreData.firstName }}</h1>
+        <h2 class="font-display text-xl text-text">{{ coreData.lastName }}</h2>
         <span class="font-display text-sm text-accent mt-1">Probably somewhere trying to draw a rock</span>
         <p class="font-body text-md text-text mt-6">I’m an aspiring polymath, on a mission to bring optimism and curiosity back to the world. I want to help people by spreading positivity and creating technologies that solve real problems.</p>
         <div class="flex flex-wrap w-full mt-4">
-          <Chip v-for="topic in masteredTopics" :key="topic" class="mt-2 mr-2">{{ topic }}</Chip>
+          <Chip v-for="topic in coreData.masteredTopics" :key="topic.id" class="mt-2 mr-2">{{ topic.name }}</Chip>
           <Chip class="mt-2 mr-2 font-bold">+ 30</Chip>
         </div>
         
@@ -126,6 +125,8 @@ import TutorialCohortStatus from '../components/TutorialCohortStatus.vue'
 import ChallengeAccept from '../components/ChallengeAccept.vue'
 import ChallengeStatus from '../components/ChallengeStatus.vue'
 
+import { getCoreData, getDailyReview, getRecommendedLectures } from '../services/HomeService.js'
+
 import firebase from "firebase/app";
 import "firebase/auth";
 
@@ -146,53 +147,39 @@ export default {
       loading: true,
       token: "",
       email: "",
-      openTab: "Learn",
+      openTab: "Explore",
       unsubAuth: null,
       search: "",
-      dailyReviewCards: [],
-      masteredTopics: [
-        "Introduction to Python",
-        "Adobe Illustration",
-        "Drawing 101",
-        "Data Analytics",
-        "Classifiers and KNNs",
-      ],
-      currentPlanet: {
-        name: "Venus-2",
-        minedKnowledge: "200",
-        totalKnowledge: "1000",
-        starSystem: {
-          name: "The Chitauri System"
-        }
-      },
-      activeChallenge: null,
-      challenges: [
+      coreData: null,
+      dailyReviewCards: null,
+      recommendedLectures: null,
+      testChallenges: [
         {
-          title: "Design a simple logical ciruit",
           status: "UNLOCKED",
-          subject: "Computer Science",
-          description: "Design a circuit to evaluate any simple logical statement",
+          challenge: {
+            title: "Design a simple logical ciruit",
+            subject: "Computer Science",
+            description: "Design a circuit to evaluate any simple logical statement",
+          }
         },
         {
-          title: "Build a half adder",
           status: "UNLOCKED",
-          subject: "Computer Science",
-          description: "Using a digital design platform, build a half adder."
+          challenge: {
+            title: "Build a half adder",
+            subject: "Computer Science",
+            description: "Using a digital design platform, build a half adder."
+          }
         },
         {
-          title: "Build a full adder",
           status: "UNLOCKED",
-          subject: "Computer Science",
-          description: "Using a digital design platform, build a full adder to demonstrate bitwise adding",
+          challenge: {
+            title: "Build a full adder",
+            subject: "Computer Science",
+            description: "Using a digital design platform, build a full adder to demonstrate bitwise adding",
+          },
         },
       ],
-      enrolledCohort: null /*{
-          title: "Designing a 8-bit CPU",
-          topic: "Computer architecture",
-          status: "ENROLLED",
-          description: "Run through the process of designing a basic 8-bit CPU",
-      }*/,
-      tutorials: [
+      testTutorials: [
         {
           title: "Designing a 8-bit CPU",
           topic: "Computer architecture",
@@ -230,6 +217,18 @@ export default {
     }
   },
   computed: {
+    progressBarStyle: function() {
+      return {
+        width: (this.coreData.currentPlanet.minedKnowledge / this.coreData.currentPlanet.planet.totalKnowledge) * 100 + '%'
+      }
+    },
+    activeChallenge: function() {
+      return this.coreData.challenges.filter((challenge) => challenge.status == "INPROGRESS")
+    },
+    availableChallenges: function() {
+      return this.coreData.challenges.filter((challenge) => challenge.status == "UNLOCKED")
+    },
+    // Tab State Handlers
     learnTabOpen: function () {
       return this.openTab == "Learn"
     },
@@ -260,6 +259,11 @@ export default {
         localStorage.setItem("FB_TOKEN", this.token)
         localStorage.setItem("EMAIL", user.email)
 
+        // Get the core data
+        let res = await getCoreData(this.token, this.email)
+        this.coreData = res.data.getLearner
+        console.log(this.coreData)
+
         this.loading = false
       } else {
         this.$router.push({ name: 'login' })
@@ -272,7 +276,16 @@ export default {
   },
   methods: {
     setActiveTab: async function(tab) {
+      this.loading = true
+      if(tab == "Challenges") {
+        let res = await getDailyReview(this.token, this.email)
+        this.dailyReviewCards = res.data.getLearner.dailyReview
+      } else if(tab == "Learn") {
+        let res = await getRecommendedLectures(this.token, this.email)
+        this.recommendedLectures = res.data.getLearner.recommendedLectures
+      }
       this.openTab = tab
+      this.loading = false
     },
     logout: async function() {
       this.loading = true

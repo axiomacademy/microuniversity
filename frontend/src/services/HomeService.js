@@ -8,39 +8,46 @@ const getCoreDataQuery = `
       challenges {
         status,
         challenge {
+          id,
           title,
           description
         }
       },
       unlockedTutorials {
+        id,
         title,
         description
       },
-      activeCohorts {
+      activeCohort {
+        status,
         tutorial {
           title,
           description,
         },
-        status
       },
       masteredTopics {
-        name
+        id,
+        name,
       },
       currentPlanet {
-        name,
-        totalKnowledge,
+        id,
         minedKnowledge,
-        starSystem {
+        completed,
+        planet {
           name,
-        }
+          totalKnowledge,
+          starSystem {
+            name,
+          }
+        },
       },
       energy,
-      coin
+      coins
     }
   }`
 
 const getDailyReviewQuery = `
-  query GetHomeData($email: String!) {
+  query GetDailyReview($email: String!) {
     getLearner(email: $email) {
       dailyReview {
         id,
@@ -53,12 +60,10 @@ const getDailyReviewQuery = `
   }`
 
 const getRecommendedLecturesQuery = `
-  query GetHomeData($email: String!) {
+  query GetRecommendedLectures($email: String!) {
     getLearner(email: $email) {
       recommendedLectures {
         title,
-        description,
-        videoLink
       }
     }
   }`

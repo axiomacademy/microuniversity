@@ -92,17 +92,19 @@ func gotoPlanet(w http.ResponseWriter, r *http.Request) {
 			Uid:    luid,
 			Energy: energy,
 			CurrentPlanet: LearnerPlanet{
-				Planet:         planetId,
-				Learner:        luid,
+				Planet:         Planet{Uid: planetId},
+				Learner:        &Learner{Uid: luid},
 				MinedKnowledge: 0,
 				Completed:      false,
 			},
 		}
 	} else {
 		l = Learner{
-			Uid:           luid,
-			Energy:        energy,
-			CurrentPlanet: d.CheckPlanetVisited[0].Uid,
+			Uid:    luid,
+			Energy: energy,
+			CurrentPlanet: LearnerPlanet{
+				Uid: d.CheckPlanetVisited[0].Uid,
+			},
 		}
 	}
 
@@ -230,8 +232,8 @@ func gotoStarsystem(w http.ResponseWriter, r *http.Request) {
 			Uid:    luid,
 			Energy: energy,
 			CurrentPlanet: LearnerPlanet{
-				Planet:         planetId,
-				Learner:        luid,
+				Planet:         Planet{Uid: planetId},
+				Learner:        &Learner{Uid: luid},
 				MinedKnowledge: 0,
 				Completed:      false,
 			},
@@ -240,7 +242,7 @@ func gotoStarsystem(w http.ResponseWriter, r *http.Request) {
 		l = Learner{
 			Uid:           luid,
 			Energy:        energy,
-			CurrentPlanet: d.CheckPlanetVisited[0].Uid,
+			CurrentPlanet: LearnerPlanet{Uid: d.CheckPlanetVisited[0].Uid},
 		}
 	}
 

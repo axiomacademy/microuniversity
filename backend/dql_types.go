@@ -92,11 +92,11 @@ type Planet struct {
 }
 
 type LearnerPlanet struct {
-	Uid            string  `json:"uid,omitempty"`
-	Planet         Planet  `json:"LearnerPlanet.planet,omitempty"`
-	Learner        Learner `json:"LearnerPlanet.learner,omitempty"`
-	MinedKnowledge int     `json:"LearnerPlanet.minedKnowledge,omitempty"`
-	Completed      bool    `json:"LearnerPlanet.completed,omitempty"`
+	Uid            string   `json:"uid,omitempty"`
+	Planet         Planet   `json:"LearnerPlanet.planet,omitempty"`
+	Learner        *Learner `json:"LearnerPlanet.learner,omitempty"`
+	MinedKnowledge int      `json:"LearnerPlanet.minedKnowledge,omitempty"`
+	Completed      bool     `json:"LearnerPlanet.completed,omitempty"`
 }
 
 type StarSystem struct {

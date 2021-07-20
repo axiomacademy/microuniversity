@@ -333,7 +333,7 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if currentPlanet.Completed {
-		l.Coins = lcoins + currentPlanet.Reward
+		l.Coins = lcoins + currentPlanet.Planet.Reward
 	}
 
 	pl, err := json.Marshal(l)

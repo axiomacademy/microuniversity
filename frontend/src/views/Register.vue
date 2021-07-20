@@ -25,7 +25,7 @@
 <script>
 import { BeatLoader } from '@saeris/vue-spinners'
 
-import { createSelf } from "../services/LearnerService.js"
+import { createSelf } from "../services/LoginService.js"
 
 import firebase from "firebase/app";
 import "firebase/auth";

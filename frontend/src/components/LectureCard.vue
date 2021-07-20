@@ -15,7 +15,7 @@
 </template>
 
 <script>
-import { completeLecture, getLectureFlashcards } from '../services/LectureService.js'
+// import { completeLecture, getLectureFlashcards } from '../services/LectureService.js'
 
 export default {
   name: 'LectureCard',
@@ -25,13 +25,13 @@ export default {
   },
   methods: {
     markLectureAsComplete: async function () {
-      // Get the lecture flashcards
+      /* Get the lecture flashcards
       await completeLecture(this.token, this.lecture.id)
       
       let lectureFlashcards = await getLectureFlashcards(this.token, this.lecture.id)
       this.$router.push({ name: 'review', params: { title: 'Lecture Review', reviewCards: lectureFlashcards, done: async function() {
         return
-      }}}) 
+      }}}) */ 
     },
   },
 }

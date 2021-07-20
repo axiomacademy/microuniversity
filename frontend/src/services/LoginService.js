@@ -1,4 +1,4 @@
-import { baseUrl, graphqlUrl } from './HttpService.js'
+import { graphqlUrl } from './HttpService.js'
 
 const getSelfQuery = `
   query GetSelf($email: String!) {
@@ -68,22 +68,4 @@ export async function createSelf(token, email, firstName, lastName, timezone) {
   }
 
   return await rawResponse.json()
-}
-
-export async function updateSelf(token, firstName, lastName, timezone) {
-  const rawResponse = await fetch(`${baseUrl}/self`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `${token}`,
-    },
-    body: JSON.stringify({
-        first_name: firstName,
-        last_name: lastName,
-        timezone: timezone
-    })
-  })
-
-  if (!rawResponse.ok) {
-    throw rawResponse.status
-  }
 }

@@ -3,38 +3,46 @@
 
     <div v-if="!loading" class="lg:w-6/12 w-full flex-grow flex flex-col">
 
-      <div v-if="openTab == 'Explore'" id="explore-tab" class="pt-4 flex-grow flex flex-col items-center px-6">
-        <div class="mt-4 mb-8 flex">
+      <div v-if="openTab == 'Explore'" id="explore-tab" class="pt-6 flex-grow flex flex-col items-center px-6">
+        <img src="../assets/planet.svg" class="w-8/12"/>
+        <h1 class="font-display text-3xl mt-4 font-bold">{{ currentPlanet.name }}</h1>
+        <h2 class="font-display text-lg text-secondary">{{ currentPlanet.starSystem.name }}</h2>
+        
+        <div class="mt-2 flex">
           <Chip class="w-20 mt-1 mr-2">100 🪙</Chip>
           <Chip class="w-20 mt-1">67% ⚡</Chip>
         </div>
-        <img src="../assets/planet.png"/>
-        <h1 class="font-display text-3xl mt-4 font-bold">{{ currentPlanet.name }}</h1>
-        <h2 class="font-display text-lg text-secondary">{{ currentPlanet.starSystem.name }}</h2>
 
-        <span class="font-body text-lg text-text mt-4 self-start font-semibold">Mining Status</span>
+        <span class="font-body text-lg text-text mt-6 self-start font-semibold">Mining Status</span>
         <div class="h-6 mt-2 relative w-full rounded-full overflow-hidden">
           <div class="w-full h-full bg-purple-100 absolute"></div>
           <div class="h-full bg-primary absolute" style="width:10%"></div>
         </div>
-        <div class="shadow-sm p-6 bg-white rounded-md flex items-center w-full mt-8">
-          <img src="../assets/planets.png" class="w-12">
-          <div class="ml-4">
+        <div class="shadow-sm px-6 py-3 bg-white rounded-md flex items-center w-full mt-8">
+          <img src="../assets/planets.svg" class="w-12">
+          <div class="ml-6">
             <h1 class="font-normal text-text text-lg">Visit another planet</h1>
             <Chip class="w-20 mt-1">100 🪙</Chip>
           </div>
         </div>
-        <div class="shadow-sm p-6 bg-white rounded-md flex items-center w-full mt-2">
-          <img src="../assets/galaxy.png" class="w-12">
-          <div class="ml-4">
+        <div class="shadow-sm px-6 py-3 bg-white rounded-md flex items-center w-full mt-3">
+          <img src="../assets/galaxy.svg" class="w-12">
+          <div class="ml-6">
             <h1 class="font-normal text-text text-lg">Visit nearby starsystem</h1>
             <Chip class="w-20 mt-1">1000 🪙</Chip>
+          </div>
+        </div>
+        <div class="shadow-sm px-6 py-3 bg-white rounded-md flex items-center w-full mt-3">
+          <img src="../assets/rocket.svg" class="w-12">
+          <div class="ml-6">
+            <h1 class="font-normal text-text text-lg">Recharge rocket</h1>
+            <Chip class="w-20 mt-1">100 🪙</Chip>
           </div>
         </div>
       </div>
       
       <div v-if="openTab == 'Challenges'" id="learn-tab" class="pt-10 flex-grow">
-        <h1 class="text-3xl font-bold max-w-0 px-10 text-secondary">Mining Activities</h1>
+        <h1 class="text-3xl font-display font-bold max-w-0 px-10 text-secondary">Mining Activities</h1>
         <div class="px-4 pt-4">
           <DailyReviewCard :dailyReviewCards="dailyReviewCards" />
         </div>
@@ -55,13 +63,26 @@
       
       <div v-if="openTab == 'Learn'" id="learn-tab" class="pt-10 flex-grow flex flex-col justify-center">
         <h1 class="text-3xl font-display font-bold max-w-0 px-10 text-secondary">Gather Knowledge</h1>
+        <input v-model="search" type="text" placeholder="Search for any knowledge..." class="bg-purple-100 p-2 rounded font-display border border-transparent focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent mt-4 placeholder-purple-300 mx-6" :disabled="loading">
         <div class="overflow-x-auto flex flex-nowrap my-auto pl-4 h-full horizontal">
-          <LectureCard v-for="lecture in lectures" :key="lecture.title" :lecture="lecture" :token="token" class="lectureCard" />
+          <LectureCard v-for="lecture in lectures" :key="lecture.id" :lecture="lecture" :token="token" class="lectureCard" />
         </div>
       </div>
       
-      <div v-if="openTab == 'Me'" id="me-tab">
-        ME
+      <div v-if="openTab == 'Me'" id="me-tab" class="pt-10 flex-grow flex flex-col px-8">
+        <img src="../assets/spaceship.svg" class="w-6/12"/>
+        <h1 class="font-display text-xl mt-4 font-bold">Sudharshan</h1>
+        <h2 class="font-display text-xl text-text">Sundaramahalingam</h2>
+        <span class="font-display text-sm text-accent mt-1">Probably somewhere trying to draw a rock</span>
+        <p class="font-body text-md text-text mt-6">I’m an aspiring polymath, on a mission to bring optimism and curiosity back to the world. I want to help people by spreading positivity and creating technologies that solve real problems.</p>
+        <div class="flex flex-wrap w-full mt-4">
+          <Chip v-for="topic in masteredTopics" :key="topic" class="mt-2 mr-2">{{ topic }}</Chip>
+          <Chip class="mt-2 mr-2 font-bold">+ 30</Chip>
+        </div>
+        
+        <button class="bg-purple-100 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-6">View History</button>
+        <button class="bg-purple-100 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-2">Edit Profile</button>
+        <button class="bg-purple-100 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-2" @click="logout">Logout</button>
       </div>
     </div>
 
@@ -127,13 +148,21 @@ export default {
       email: "",
       openTab: "Learn",
       unsubAuth: null,
+      search: "",
       dailyReviewCards: [],
+      masteredTopics: [
+        "Introduction to Python",
+        "Adobe Illustration",
+        "Drawing 101",
+        "Data Analytics",
+        "Classifiers and KNNs",
+      ],
       currentPlanet: {
-        name: "Venus-256",
+        name: "Venus-2",
         minedKnowledge: "200",
         totalKnowledge: "1000",
         starSystem: {
-          name: "Solar System"
+          name: "The Chitauri System"
         }
       },
       activeChallenge: null,
@@ -177,18 +206,21 @@ export default {
       ],
       lectures: [
         {
+          id:1,
           title: "Electronic Computing",
           subject: "Computer Science",
           description: "Learn all about electronic computing and be aware of the 1819 census",
           video_link: "https://www.youtube.com/embed/LN0ucKNX0hc"
         },
         {
+          id:2,
           title: "Electronic Computing",
           subject: "Computer Science",
           description: "Learn all about electronic computing and be aware of the 1819 census",
           video_link: "https://www.youtube.com/embed/LN0ucKNX0hc"
         },
         {
+          id:3,
           title: "Electronic Computing",
           subject: "Computer Science",
           description: "Learn all about electronic computing and be aware of the 1819 census",

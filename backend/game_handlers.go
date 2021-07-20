@@ -35,12 +35,20 @@ func gotoPlanet(w http.ResponseWriter, r *http.Request) {
 		query checkPlanetNearby($planetId: string, $learnerId: string) {
 			checkPlanetNearby(func: uid($learnerId)) @cascade {
 				Learner.currentPlanet @cascade {
-					Planet.starSystem @cascade {
-						StarSystem.planets @filter(uid($planetId)) {
-							uid
+					LearnerPlanet.planet @cascade {
+						Planet.starSystem @cascade {
+							StarSystem.planets @filter(uid($planetId)) {
+								uid
+							}
 						}
 					}
 				}
+			}
+		}
+
+		query checkPlanetVisited($planetId: string, $learnerId: string) {
+			checkPlanetVisited(func: type(LearnerPlanet)) @filter(uid_in(planet, $planetId) AND uid_in(learner, $learnerId)) {
+				uid
 			}
 		}
 	`
@@ -59,7 +67,8 @@ func gotoPlanet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var d struct {
-		CheckPlanetNearby []Learner
+		CheckPlanetNearby  []Learner
+		CheckPlanetVisited []LearnerPlanet
 	}
 
 	if err := json.Unmarshal(resp.GetJson(), &d); err != nil {
@@ -75,12 +84,26 @@ func gotoPlanet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l := Learner{
-		Uid:    luid,
-		Energy: energy,
-		CurrentPlanet: Planet{
-			Uid: planetId,
-		},
+	// Check if planet visited
+	var l Learner
+	if len(d.CheckPlanetVisited) == 0 {
+		// Planet not visited
+		l = Learner{
+			Uid:    luid,
+			Energy: energy,
+			CurrentPlanet: LearnerPlanet{
+				Planet:         planetId,
+				Learner:        luid,
+				MinedKnowledge: 0,
+				Completed:      false,
+			},
+		}
+	} else {
+		l = Learner{
+			Uid:           luid,
+			Energy:        energy,
+			CurrentPlanet: d.CheckPlanetVisited[0].Uid,
+		}
 	}
 
 	pl, err := json.Marshal(l)
@@ -142,19 +165,26 @@ func gotoStarsystem(w http.ResponseWriter, r *http.Request) {
 
 	// Make sure the planet is visitable
 	const checkSystemNearby = `
-query checkPlanetNearby($systemId: string, $planetId: string, $learnerId: string) {
+		query checkPlanetNearby($systemId: string, $planetId: string, $learnerId: string) {
 			checkPlanetNearby(func: uid($learnerId)) @cascade {
 				Learner.currentPlanet @cascade {
-					Planet.starSystem @cascade {
-						StarSystem.nearbySystems @cascade {
-							uid
-							StarSystem.name
-							StarSystem.planets @filter(uid($planetId)) {
+					LearnerPlanet.planet {
+						Planet.starSystem @cascade {
+							StarSystem.nearbySystems @cascade {
 								uid
+								StarSystem.name
+								StarSystem.planets @filter(uid($planetId)) {
+									uid
+								}
 							}
 						}
 					}
 				}
+			}
+		}
+		query checkPlanetVisited($planetId: string, $learnerId: string) {
+			checkPlanetVisited(func: type(LearnerPlanet)) @filter(uid_in(planet, $planetId) AND uid_in(learner, $learnerId)) {
+				uid
 			}
 		}
 	`
@@ -174,7 +204,8 @@ query checkPlanetNearby($systemId: string, $planetId: string, $learnerId: string
 	}
 
 	var d struct {
-		CheckSystemNearby []Learner
+		CheckSystemNearby  []Learner
+		CheckPlanetVisited []LearnerPlanet
 	}
 
 	if err := json.Unmarshal(resp.GetJson(), &d); err != nil {
@@ -192,12 +223,25 @@ query checkPlanetNearby($systemId: string, $planetId: string, $learnerId: string
 
 	// TODO: generate planets and systems programatically
 
-	l := Learner{
-		Uid:    luid,
-		Energy: energy,
-		CurrentPlanet: Planet{
-			Uid: planetId,
-		},
+	var l Learner
+	if len(d.CheckPlanetVisited) == 0 {
+		// Planet not visited
+		l = Learner{
+			Uid:    luid,
+			Energy: energy,
+			CurrentPlanet: LearnerPlanet{
+				Planet:         planetId,
+				Learner:        luid,
+				MinedKnowledge: 0,
+				Completed:      false,
+			},
+		}
+	} else {
+		l = Learner{
+			Uid:           luid,
+			Energy:        energy,
+			CurrentPlanet: d.CheckPlanetVisited[0].Uid,
+		}
 	}
 
 	pl, err := json.Marshal(l)

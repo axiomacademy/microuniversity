@@ -48,7 +48,7 @@ type Learner @auth(
   masteredTopics: [Topic!]!
 
   # Gamification Elements
-  currentPlanet: Planet!
+  currentPlanet: LearnerPlanet!
   energy: Int!
   coins: Int!
 
@@ -64,6 +64,97 @@ type Learner @auth(
     body: "{ email: $email }",
     forwardHeaders: ["Authorization"]
   })
+}
+
+type LearnerPlanet @generate(
+  query: {
+    get: true,
+    query: true,
+    aggregate: false,
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false,
+  }
+  subscription: false
+) @auth(
+  query: { rule: """ 
+    query ($USER: String!) {
+      queryLearnerPlanet {
+        learner(filter: { email: { eq: $USER } } ) {
+          email
+        }
+      }
+    }"""
+  }
+)
+{
+  id: ID!
+  planet: Planet!
+  learner: Learner!
+  minedKnowledge: Int!
+  completed: Boolean!
+}
+
+type LearnerReviewCard @generate(
+  query: {
+    get: true,
+    query: true,
+    aggregate: false,
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false
+  },
+  subscription: false
+) @auth(
+  query: { rule: """ 
+    query ($USER: String!) {
+      queryLearnerReviewCard {
+        learner(filter: { email: { eq: $USER } } ) {
+          email
+        }
+      }
+    }"""
+  }
+)
+{
+  id: ID!
+  reviewCard: ReviewCard!
+  learner: Learner!
+  repeat: Int!
+  selected: DateTime!
+}
+
+type LearnerChallenge @generate( 
+  query: {
+    get: true,
+    query: true,
+    aggregate: false
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false
+  },
+  subscription: false
+) @auth(
+  query: { rule: """ 
+    query ($USER: String!) {
+      queryLearnerChallenge {
+        learner(filter: { email: { eq: $USER } } ) {
+          email
+        }
+      }
+    }"""
+  }
+)
+{
+  challenge: Challenge!
+  learner: Learner!
+  status: ChallengeStatus!
 }
 
 type Planet @generate(
@@ -83,9 +174,7 @@ type Planet @generate(
   id: ID!
   name: String!
   totalKnowledge: Int!
-  minedKnowledge: Int!
   reward: Int!
-  completed: Boolean!
   starSystem: StarSystem!
 }
 
@@ -214,7 +303,6 @@ enum TutorialStatus {
   DONE
 }
 
-
 type TutorialCohort @generate( 
   query: {
     get: false,
@@ -255,39 +343,6 @@ type ReviewCard @generate(
   lecture: Lecture!
 }
 
-type LearnerReviewCard 
-@generate(
-  query: {
-    get: true,
-    query: true,
-    aggregate: false,
-  },
-  mutation: {
-    add: false,
-    delete: false,
-    update: false
-  },
-  subscription: false
-) 
-@auth(
-  query: { rule: """ 
-    query ($USER: String!) {
-      queryLearnerReviewCard {
-        learner(filter: { email: { eq: $USER } } ) {
-          email
-        }
-      }
-    }"""
-  }
-)
-{
-  id: ID!
-  reviewCard: ReviewCard!
-  learner: Learner!
-  repeat: Int!
-  selected: DateTime!
-}
-
 # Challenge
 enum ChallengeStatus {
   UNLOCKED
@@ -318,37 +373,6 @@ type Challenge @generate(
   unlocksTutorials: [Tutorial!]!
 }
 
-type LearnerChallenge 
-@generate( 
-  query: {
-    get: true,
-    query: true,
-    aggregate: false
-  },
-  mutation: {
-    add: false,
-    delete: false,
-    update: false
-  },
-  subscription: false
-)
-@auth(
-  query: { rule: """ 
-    query ($USER: String!) {
-      queryLearnerChallenge {
-        learner(filter: { email: { eq: $USER } } ) {
-          email
-        }
-      }
-    }"""
-  }
-)
-{
-  challenge: Challenge!
-  learner: Learner!
-  status: ChallengeStatus!
-}
-
 # Complete Lecture mutation usually returns a review
 type CompleteLectureReward @remote {
   cards: [LearnerReviewCard!]!
@@ -365,7 +389,7 @@ type RemoteLearnerReviewCard @remote {
 
 type Mutation {
   completeLecture(id: ID!): CompleteLectureReward! @custom(http: {
-    url: "http://10.114.10.86:8003/api/v0.3/lecture/complete?lectureId=$id"
+    url: "http://192.168.10.139:8003/api/v0.3/lecture/complete?lectureId=$id"
     method: "POST",
     forwardHeaders: ["Authorization"]
   })

@@ -66,9 +66,9 @@ type TutorialCohort struct {
 type Learner struct {
 	Uid string `json:"uid,omitempty"`
 
-	Energy        int    `json:"Learner.energy,omitempty"`
-	Coins         int    `json:"Learner.coins,omitempty"`
-	CurrentPlanet Planet `json:"Learner.currentPlanet,omitempty"`
+	Energy        int           `json:"Learner.energy,omitempty"`
+	Coins         int           `json:"Learner.coins,omitempty"`
+	CurrentPlanet LearnerPlanet `json:"Learner.currentPlanet,omitempty"`
 
 	Cards             []LearnerReviewCard `json:"Learner.cards,omitempty"`
 	Challenges        []LearnerChallenge  `json:"Learner.challenges,omitempty"`
@@ -88,9 +88,15 @@ type Planet struct {
 	Uid            string     `json:"uid,omitempty"`
 	StarSystem     StarSystem `json:"Planet.starSystem,omitempty"`
 	TotalKnowledge int        `json:"Planet.totalKnowledge,omitempty"`
-	MinedKnowledge int        `json:"Planet.minedoKnowledge,omitempty"`
 	Reward         int        `json:"Planet.reward,omitempty"`
-	Completed      bool       `json:"Planet.completed,omitempty"`
+}
+
+type LearnerPlanet struct {
+	Uid            string  `json:"uid,omitempty"`
+	Planet         Planet  `json:"LearnerPlanet.planet,omitempty"`
+	Learner        Learner `json:"LearnerPlanet.learner,omitempty"`
+	MinedKnowledge int     `json:"LearnerPlanet.minedKnowledge,omitempty"`
+	Completed      bool    `json:"LearnerPlanet.completed,omitempty"`
 }
 
 type StarSystem struct {

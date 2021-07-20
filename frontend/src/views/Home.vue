@@ -9,8 +9,8 @@
         <h2 class="font-display text-lg text-secondary">{{ currentPlanet.starSystem.name }}</h2>
         
         <div class="mt-2 flex">
-          <Chip class="w-20 mt-1 mr-2">100 🪙</Chip>
-          <Chip class="w-20 mt-1">67% ⚡</Chip>
+          <Chip class="w-20 mt-1 mr-2">1000 🪙</Chip>
+          <Chip class="w-20 mt-1">100 ⚡</Chip>
         </div>
 
         <span class="font-body text-lg text-text mt-6 self-start font-semibold">Mining Status</span>
@@ -22,14 +22,14 @@
           <img src="../assets/planets.svg" class="w-12">
           <div class="ml-6">
             <h1 class="font-normal text-text text-lg">Visit another planet</h1>
-            <Chip class="w-20 mt-1">100 🪙</Chip>
+            <Chip class="w-20 mt-1">10 ⚡</Chip>
           </div>
         </div>
         <div class="shadow-sm px-6 py-3 bg-white rounded-md flex items-center w-full mt-3">
           <img src="../assets/galaxy.svg" class="w-12">
           <div class="ml-6">
             <h1 class="font-normal text-text text-lg">Visit nearby starsystem</h1>
-            <Chip class="w-20 mt-1">1000 🪙</Chip>
+            <Chip class="w-20 mt-1">30 ⚡</Chip>
           </div>
         </div>
         <div class="shadow-sm px-6 py-3 bg-white rounded-md flex items-center w-full mt-3">

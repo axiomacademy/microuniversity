@@ -13,14 +13,31 @@ type Learner @auth(
       }
     }"""
   },
-  delete: { rule:  "{$DENIED: { eq: \"DENIED\" } }"},
+  delete: { rule: """
+    query ($USER: String!) {
+      queryLearner(filter: { email: { eq: $USER } } ) {
+        email
+      }
+    }"""
+  },
   update: { rule:  "{$DENIED: { eq: \"DENIED\" } }"}
+) @generate(
+  query: {
+    get: true,
+    query: true,
+    aggregate: false,
+  },
+  mutation: {
+    add: true,
+    delete: true,
+    update: false,
+  }
+  subscription: false
 )
 {
   email: String! @id
   firstName: String!
   lastName: String!
-  lastCompleted: DateTime!
   timezone: String!
 
   completedLectures: [Lecture!]! @hasInverse(field: completedLearners)
@@ -96,7 +113,7 @@ type StarSystem @generate(
 type Subject @generate(
   query: {
     get: false,
-    query: true,
+    query: false,
     aggregate: false
   },
   mutation: {
@@ -113,8 +130,8 @@ type Subject @generate(
 
 type Topic @generate(
   query: {
-    get: true,
-    query: true,
+    get: false,
+    query: false,
     aggregate: false
   },
   mutation: {
@@ -243,7 +260,7 @@ type LearnerReviewCard
   query: {
     get: true,
     query: true,
-    aggregate: true
+    aggregate: false,
   },
   mutation: {
     add: false,
@@ -306,7 +323,7 @@ type LearnerChallenge
   query: {
     get: true,
     query: true,
-    aggregate: true
+    aggregate: false
   },
   mutation: {
     add: false,
@@ -330,7 +347,6 @@ type LearnerChallenge
   challenge: Challenge!
   learner: Learner!
   status: ChallengeStatus!
-  selected: DateTime!
 }
 
 # Complete Lecture mutation usually returns a review

@@ -152,10 +152,7 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 				Learner.currentPlanet {
 					uid
 					LearnerPlanet.minedKnowledge
-					LearnerPlanet.planet {
-						Planet.totalKnowledge
-						Planet.reward
-					}
+					LearnerPlanet.completed
 				}
 				Learner.challenges @filter(uid($challengeId)) {
 					uid
@@ -318,10 +315,10 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 
 	// Check currrent planet mining levels
 	mineLevel := currentPlanet.MinedKnowledge + CHALLENGE_KNOWLEDGE
-	if mineLevel < currentPlanet.Planet.TotalKnowledge {
+	if mineLevel < TOTAL_PLANET_KNOWLEDGE {
 		currentPlanet.MinedKnowledge = mineLevel
 	} else {
-		currentPlanet.MinedKnowledge = currentPlanet.Planet.TotalKnowledge
+		currentPlanet.MinedKnowledge = TOTAL_PLANET_KNOWLEDGE
 		currentPlanet.Completed = true
 	}
 
@@ -333,7 +330,7 @@ func completeChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if currentPlanet.Completed {
-		l.Coins = lcoins + currentPlanet.Planet.Reward
+		l.Coins = lcoins + PLANET_REWARD
 	}
 
 	pl, err := json.Marshal(l)

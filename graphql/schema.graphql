@@ -173,8 +173,6 @@ type Planet @generate(
 {
   id: ID!
   name: String!
-  totalKnowledge: Int!
-  reward: Int!
   starSystem: StarSystem!
 }
 

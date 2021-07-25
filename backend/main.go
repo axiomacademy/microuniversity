@@ -64,7 +64,7 @@ func main() {
 	auth := r.PathPrefix("/api/v0.3").Subrouter()
 
 	// Lecture handlers
-	auth.HandleFunc("/lecture/complete", completeLecture).Methods("POST", "OPTIONS") // Deplete energy
+	auth.HandleFunc("/lecture/complete", completeLecture).Methods("POST", "OPTIONS")
 	auth.HandleFunc("/lecture/recommended", recommendedLectures).Methods("GET", "OPTIONS")
 
 	// Review handlers
@@ -74,15 +74,15 @@ func main() {
 	auth.HandleFunc("/review/card/fail", failReviewCard).Methods("POST", "OPTIONS")
 
 	// Challenge handlers
-	auth.HandleFunc("/challenge/accept", acceptChallenge).Methods("POST", "OPTIONS")     // Depletes energy
-	auth.HandleFunc("/challenge/complete", completeChallenge).Methods("POST", "OPTIONS") // Mines knowledge
+	auth.HandleFunc("/challenge/accept", acceptChallenge).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/challenge/complete", completeChallenge).Methods("POST", "OPTIONS")
 
 	// Tutorial handlers
-	auth.HandleFunc("/tutorial/enroll", enrollTutorial).Methods("POST", "OPTIONS") // Depletes energy
+	auth.HandleFunc("/tutorial/enroll", enrollTutorial).Methods("POST", "OPTIONS")
 
 	// Game handlers
-	auth.HandleFunc("/planet/goto", gotoPlanet).Methods("POST", "OPTIONS")         // Deplete Energy
-	auth.HandleFunc("/starsystem/goto", gotoStarsystem).Methods("POST", "OPTIONS") // Deplete Energy
+	auth.HandleFunc("/planet/goto", gotoPlanet).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/starsystem/goto", gotoStarsystem).Methods("POST", "OPTIONS")
 
 	// Enabling middlewares
 	r.Use(corsMiddleware)

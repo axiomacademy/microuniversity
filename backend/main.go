@@ -15,10 +15,12 @@ import (
 	"google.golang.org/grpc"
 )
 
-// The code oraganisation in this codebase is heavily inspired by Mat Ryer
-// Read the article @ https://pace.dev/blog/2018/05/09/how-I-write-http-services-after-eight-years.html
-
-// All HTTP server code is handled inside/by the server struct in server.go
+/*
+ * The code oraganisation in this codebase is heavily inspired by Mat Ryer
+ * Read the article @ https://pace.dev/blog/2018/05/09/how-I-write-http-services-after-eight-years.html
+ *
+ * All HTTP server code is handled inside/by the server struct in server.go
+ */
 
 // Constants
 const PLANET_ENERGY_DEPLETION int = 100
@@ -38,24 +40,30 @@ func main() {
 	}
 }
 
-// Setup dependencies for the server and run it
+// etup dependencies for the server and run it
 func run() error {
+
 	log.Print("Server initialising...")
 
 	// Getting all the environmental variables
-	DB_URL = os.Getenv("DB_URL")
+	DB_URL := os.Getenv("DB_URL")
 	checkEnvVariable(DB_URL)
 
 	// Loading up firebase
 	var err error
 	opt := option.WithCredentialsFile("./fb-creds.json")
 	fb, err := firebase.NewApp(context.Background(), nil, opt)
-	PanicOnError(err)
+	if err != nil {
+		return err
+	}
 
 	// Initialise the dgraph database
 	conn, err := grpc.Dial(DB_URL, grpc.WithInsecure())
-	PanicOnError(err)
-	dg = dgo.NewDgraphClient(
+	if err != nil {
+		return err
+	}
+
+	dg := dgo.NewDgraphClient(
 		api.NewDgraphClient(conn),
 	)
 
@@ -65,18 +73,15 @@ func run() error {
 		fb:     fb,
 		router: mux.NewRouter(),
 	}
+	s.routes()
 
 	log.Print("All setup running, and available on port 8003")
-	http.ListenAndServe(":8003", server)
+	http.ListenAndServe(":8003", s)
+
+	return nil
 }
 
 /********* UTILITIES **************/
-func PanicOnError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
 func checkEnvVariable(env string) {
 	if env == "" {
 		log.Panic("Some environmental variables are not populated")

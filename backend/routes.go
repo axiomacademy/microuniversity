@@ -89,7 +89,7 @@ func (s *server) authMiddleware(next http.Handler) http.Handler {
 			}
 		`
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), userUid, map[string]string{

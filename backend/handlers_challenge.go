@@ -46,7 +46,7 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 			}
 		`
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), checkChallengeStatus, map[string]string{
@@ -186,7 +186,7 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 		}
 	`
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), checkIfChallengeComplete, map[string]string{

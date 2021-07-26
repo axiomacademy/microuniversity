@@ -59,7 +59,7 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 		}
 	`
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), checkPlanetNearby, map[string]string{
@@ -151,7 +151,7 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 // * Check that starsystem is nearby and planet is inside starsystem
 // * Set currentPlanet to the new planet and subtract energy costs
 
-func (s *server) handleGotoStarsystem() http.HandleFunc {
+func (s *server) handleGotoStarsystem() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")
 		energy, _ := strconv.Atoi(r.Header.Get("X-Energy-Claim"))
@@ -205,7 +205,7 @@ func (s *server) handleGotoStarsystem() http.HandleFunc {
 		}
 	`
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), checkSystemNearby, map[string]string{

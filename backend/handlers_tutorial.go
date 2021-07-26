@@ -15,8 +15,8 @@ import (
 // * Find an unfilled cohort and add them in
 // * If unfilled cohort becomes filled, set the status
 // * If there is no unfilled cohort, create a new cohort and add them in
-func (s *server) handleEnrollTutorial() http.HandleFunc {
-	return func(w http.Response, r *http.Request) {
+func (s *server) handleEnrollTutorial() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")
 		energy, _ := strconv.Atoi(r.Header.Get("X-Energy-Claim"))
 
@@ -48,7 +48,7 @@ func (s *server) handleEnrollTutorial() http.HandleFunc {
 		}
 	`
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), checkIfTutorialUnlocked, map[string]string{

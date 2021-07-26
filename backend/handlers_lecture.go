@@ -11,7 +11,7 @@ import (
 
 // Generate the recommended lectures
 // Requires: learnerId
-func (s *server) handleRecommendedLectures() http.HandleFunc {
+func (s *server) handleRecommendedLectures() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")
 
@@ -37,7 +37,7 @@ func (s *server) handleRecommendedLectures() http.HandleFunc {
 		}
 	`
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), getRecommendedLectures, map[string]string{
@@ -96,7 +96,7 @@ func (s *server) handleRecommendedLectures() http.HandleFunc {
 // * Add review cards to the user
 // * Check and add unlocked challenges
 // * Mark lecture as complete and deplete energy
-func (s *server) handleCompleteLecture() http.HandleFunc {
+func (s *server) handleCompleteLecture() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")
 		energy, _ := strconv.Atoi(r.Header.Get("X-Energy-Claim"))
@@ -128,7 +128,7 @@ func (s *server) handleCompleteLecture() http.HandleFunc {
 		}
 	`
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), getLearner, map[string]string{

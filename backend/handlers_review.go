@@ -29,7 +29,7 @@ func (s *server) handlePassReviewCard() http.HandlerFunc {
 		}
 	`
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), getReviewCard, map[string]string{
@@ -125,7 +125,7 @@ func (s *server) handleFailReviewCard() http.HandlerFunc {
 		}
 	`
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), getReviewCard, map[string]string{
@@ -207,7 +207,7 @@ func (s *server) handleCompleteReview() http.HandlerFunc {
 			LastCompleted: time.Now().UTC(),
 		}
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		pb, err := json.Marshal(l)
@@ -260,7 +260,7 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 		}
 	`
 
-		txn := c.NewTxn()
+		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), checkLastCompleted, map[string]string{

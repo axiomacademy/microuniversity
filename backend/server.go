@@ -16,7 +16,7 @@ type server struct {
 }
 
 // Implements HTTP.Handler
-func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Pass control to the router
 	s.router.ServeHTTP(w, r)
 }

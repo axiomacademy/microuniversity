@@ -11,6 +11,7 @@ import (
 
 // Generate the recommended lectures
 // Requires: learnerId
+// 1. Fetches all the completed lectures whose direct pre-reqs/post-reqs are incomplete
 func (s *server) handleRecommendedLectures() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")
@@ -91,11 +92,11 @@ func (s *server) handleRecommendedLectures() http.HandlerFunc {
 
 // Complete a lecture
 // Required: lectureId, learnerId, energy
-// * Check sufficient energy
-// * Check that it is incomplete
-// * Add review cards to the user
-// * Check and add unlocked challenges
-// * Mark lecture as complete and deplete energy
+// 1. Check sufficient energy
+// 2. Check that it is incomplete
+// 3. Add review cards to the user
+// 4. Check and add unlocked challenges
+// 5. Mark lecture as complete and deplete energy
 func (s *server) handleCompleteLecture() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")
@@ -300,7 +301,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 		}
 
 		// Link the lecture to the cards
-		const lReviewCards = `
+		const lCardsAndChallenges = `
 		query learnerReviewCards($lectureId: string, $learnerId: string) {
 			learnerReviewCards(func: type("LearnerReviewCard")) @cascade {
 				uid
@@ -329,7 +330,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 		}	
 	`
 
-		resp, err = txn.QueryWithVars(r.Context(), lReviewCards, map[string]string{
+		resp, err = txn.QueryWithVars(r.Context(), lCardsAndChallenges, map[string]string{
 			"$lectureId": lectureId,
 			"$learnerId": luid,
 		})

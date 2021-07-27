@@ -35,7 +35,9 @@ func (s *server) routes() {
 	s.router.Use(s.authMiddleware)
 }
 
-/******************* MIDDLEWARES ****************************/
+/*
+ * Middlewares
+ */
 func (s *server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -62,7 +64,7 @@ func (s *server) authMiddleware(next http.Handler) http.Handler {
 		}
 
 		ctx := context.Background()
-		client, err := fb.Auth(ctx)
+		client, err := s.fb.Auth(ctx)
 		if err != nil {
 			http.Error(w, "Error validating auth token", http.StatusInternalServerError)
 			return
@@ -117,8 +119,8 @@ func (s *server) authMiddleware(next http.Handler) http.Handler {
 
 		r.Header.Set("X-User-Claim", email)
 		r.Header.Set("X-Uid-Claim", decode.UserUid[0].Uid)
-		r.Header.Set("X-Coins-Claim", string(decode.UserUid[0].Coins))
-		r.Header.Set("X-Energy-Claim", string(decode.UserUid[0].Energy))
+		r.Header.Set("X-Coins-Claim", fmt.Sprint(decode.UserUid[0].Coins))
+		r.Header.Set("X-Energy-Claim", fmt.Sprint(decode.UserUid[0].Energy))
 		next.ServeHTTP(w, r)
 	})
 }

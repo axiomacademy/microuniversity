@@ -12,8 +12,8 @@ import (
 
 // Pass Review Card
 // Requires: learnerId, reviewCardId
-// * Remove review card from daily list
-// * Cofigure the repeat count
+// 1. Remove review card from daily list
+// 2. Cofigure the repeat count to be decremented until 0
 func (s *server) handlePassReviewCard() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")
@@ -109,7 +109,7 @@ func (s *server) handlePassReviewCard() http.HandlerFunc {
 // Fail Review Card
 // Requires: learnerId, reviewCardId
 // * Remove review card from daily list
-// * Cofigure the repeat count
+// * Set the repeat count to 3
 func (s *server) handleFailReviewCard() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")
@@ -195,7 +195,7 @@ func (s *server) handleFailReviewCard() http.HandlerFunc {
 	}
 }
 
-// Mark a review as complete
+// Mark daily review as complete
 // Requires: learnerId
 // * Sets last completed to the current time
 func (s *server) handleCompleteReview() http.HandlerFunc {
@@ -243,10 +243,10 @@ func (s *server) handleCompleteReview() http.HandlerFunc {
 
 // Get the daily review
 // Requires: learnerId
-// * Checks if the daily review is already complete
-// * Gets all the cards that need to be repeated
-// * Select 20 of them if repeat > 20
-// * If repeat < 20, select a random number of other cards to make the number 20
+// 1. Checks if the daily review is already complete
+// 2. Gets all the cards that need to be repeated
+// 3. Select 20 of them if repeat > 20
+// 4. If repeat < 20, select a random number of other cards to make the number 20
 func (s *server) handleDailyReview() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")

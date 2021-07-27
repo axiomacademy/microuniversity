@@ -11,9 +11,9 @@ import (
 
 // Go to a nearby planet (in the same starsystem)
 // Requires: planetId, energy, learnerId
-// * Check energy requirements
-// * Check that the planet is nearby
-// * Set currentPlanet to the new planet, and subtract energy costs
+// 1. Check energy requirements
+// 2. Check that the planet is nearby
+// 3. Set currentPlanet to the new planet, and subtract energy costs
 func (s *server) handleGotoPlanet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")
@@ -147,9 +147,9 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 
 // Go to nearby Starsystem
 // Requires: starSystemId, planetId, energy, learnerId
-// * Check energy requirements
-// * Check that starsystem is nearby and planet is inside starsystem
-// * Set currentPlanet to the new planet and subtract energy costs
+// 1. Check energy requirements
+// 2. Check that starsystem is nearby and planet is inside starsystem
+// 3. Set currentPlanet to the new planet and subtract energy costs
 
 func (s *server) handleGotoStarsystem() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

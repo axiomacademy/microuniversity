@@ -11,8 +11,9 @@ import (
 
 // Accepts a challenge
 // Requires: challengeId, energy, learnerId
-// * Checks that the there is enough energy for the Challenge
-// * Subtracts the energy cost and sets the challenge status to INPROGRESS
+// 1. Checks that the there is enough energy for the Challenge
+// 2. Checks the challenge status to ensure that it's incomplete and it exists
+// 2. Subtracts the energy cost and sets the challenge status to INPROGRESS
 func (s *server) handleAcceptChallenge() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")
@@ -72,14 +73,14 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 		}
 
 		if len(decode.CheckChallengeStatus[0].Challenges) != 1 {
-			fmt.Println("Oops")
-			http.Error(w, "oops", http.StatusInternalServerError)
+			fmt.Println("Challenge doesn't exist")
+			http.Error(w, "Challenge doesn't exist", http.StatusInternalServerError)
 			return
 		}
 
 		if decode.CheckChallengeStatus[0].Challenges[0].Status != "UNLOCKED" {
-			fmt.Println("Incorrect status")
-			http.Error(w, "Incorrect status", http.StatusBadRequest)
+			fmt.Println("Incorrect challenge status")
+			http.Error(w, "Incorrect challenge status", http.StatusBadRequest)
 			return
 		}
 
@@ -141,11 +142,11 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 
 // Completes a challenge
 // Requires: challengeId, coins, learnerId
-// * Checks if a challenge is complete,
-// * Check currentPlanet can still be mined
-// * Set challenge to complete and check for unlocked Tutorials
-// * Add unlocked tutorials to learner and increment current plant mining
-// * Check if planet is fully mined, and if so increment the coins
+// 1. Checks if a challenge is complete,
+// 2. Check currentPlanet can still be mined
+// 3. Set challenge to complete and check for unlocked Tutorials
+// 4. Add unlocked tutorials to learner and increment current planet mining
+// 5. If planet is fully mined, and increment the coin and set planet status
 func (s *server) handleCompleteChallenge() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")

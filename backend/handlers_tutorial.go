@@ -11,10 +11,10 @@ import (
 
 // Enroll in a tutorial
 // Requires: energy, learnerId, tutorialId
-// * Check if enough energy, and tutorial is unlocked
-// * Find an unfilled cohort and add them in
-// * If unfilled cohort becomes filled, set the status
-// * If there is no unfilled cohort, create a new cohort and add them in
+// 1. Check if enough energy, and tutorial is unlocked
+// 2. Find an unfilled cohort and add them in
+// 3. If unfilled cohort becomes filled, set the status
+// 4. If there is no unfilled cohort, create a new cohort and add them in
 func (s *server) handleEnrollTutorial() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		luid := r.Header.Get("X-Uid-Claim")

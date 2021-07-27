@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/dgraph-io/dgo/v200/protos/api"
 )
@@ -16,8 +15,11 @@ import (
 // 2. Subtracts the energy cost and sets the challenge status to INPROGRESS
 func (s *server) handleAcceptChallenge() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		luid := r.Header.Get("X-Uid-Claim")
-		energy, _ := strconv.Atoi(r.Header.Get("X-Energy-Claim"))
+		l, ok := r.Context().Value("learner").(Learner)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		query := r.URL.Query()
 		challengeId := query.Get("challengeId")
@@ -28,8 +30,8 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 		}
 
 		// Calculate energy depletion
-		if e := energy - CHALLENGE_ENERGY_DEPLETION; e >= 0 {
-			energy = e
+		if e := l.Energy - CHALLENGE_ENERGY_DEPLETION; e >= 0 {
+			l.Energy = e
 		} else {
 			fmt.Println("Not enough energy")
 			http.Error(w, "Not enough energy", http.StatusBadRequest)
@@ -52,7 +54,7 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 
 		resp, err := txn.QueryWithVars(r.Context(), checkChallengeStatus, map[string]string{
 			"$challengeId": challengeId,
-			"$learnerId":   luid,
+			"$learnerId":   l.Uid,
 		})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -104,8 +106,8 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 		}
 
 		updateLearner := Learner{
-			Uid:    luid,
-			Energy: energy,
+			Uid:    l.Uid,
+			Energy: l.Energy,
 		}
 
 		pl, err := json.Marshal(updateLearner)
@@ -127,14 +129,12 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 			return
 		}
 
-		/*
-			err = txn.Commit(r.Context())
-			if err != nil {
-				fmt.Println(err.Error())
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		*/
+		err = txn.Commit(r.Context())
+		if err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		return
 	}
@@ -149,8 +149,11 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 // 5. If planet is fully mined, and increment the coin and set planet status
 func (s *server) handleCompleteChallenge() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		luid := r.Header.Get("X-Uid-Claim")
-		lcoins, _ := strconv.Atoi(r.Header.Get("X-Coins-Claim"))
+		l, ok := r.Context().Value("learner").(Learner)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		query := r.URL.Query()
 		challengeId := query.Get("challengeId")
@@ -192,7 +195,7 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 
 		resp, err := txn.QueryWithVars(r.Context(), checkIfChallengeComplete, map[string]string{
 			"$challengeId": challengeId,
-			"$learnerId":   luid,
+			"$learnerId":   l.Uid,
 		})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -288,7 +291,7 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 			fmt.Println(tutorial.Uid)
 			resp, err := txn.QueryWithVars(r.Context(), getTutorialUnlocked, map[string]string{
 				"$tutorialId": tutorial.Uid,
-				"$learnerId":  luid,
+				"$learnerId":  l.Uid,
 			})
 			if err != nil {
 				fmt.Println(err.Error())
@@ -338,17 +341,17 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 		}
 
 		// Add unlocked tutorials
-		l := Learner{
-			Uid:               luid,
+		updateLearner := Learner{
+			Uid:               l.Uid,
 			UnlockedTutorials: unlockedTutorials,
 			CurrentPlanet:     currentPlanet,
 		}
 
 		if currentPlanet.Completed {
-			l.Coins = lcoins + PLANET_REWARD
+			updateLearner.Coins = l.Coins + PLANET_REWARD
 		}
 
-		pl, err := json.Marshal(l)
+		pl, err := json.Marshal(updateLearner)
 		if err != nil {
 			fmt.Println(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)

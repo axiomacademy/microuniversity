@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/dgraph-io/dgo/v200/protos/api"
 )
@@ -16,8 +15,11 @@ import (
 // 3. Set currentPlanet to the new planet, and subtract energy costs
 func (s *server) handleGotoPlanet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		luid := r.Header.Get("X-Uid-Claim")
-		energy, _ := strconv.Atoi(r.Header.Get("X-Energy-Claim"))
+		l, ok := r.Context().Value("learner").(Learner)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		query := r.URL.Query()
 		planetId := query.Get("planetId")
@@ -28,8 +30,8 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 		}
 
 		// Calculate energy depletion
-		if e := energy - PLANET_ENERGY_DEPLETION; e >= 0 {
-			energy = e
+		if e := l.Energy - PLANET_ENERGY_DEPLETION; e >= 0 {
+			l.Energy = e
 		} else {
 			fmt.Println("Not enough energy")
 			http.Error(w, "Not enough energy", http.StatusBadRequest)
@@ -64,7 +66,7 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 
 		resp, err := txn.QueryWithVars(r.Context(), checkPlanetNearby, map[string]string{
 			"$planetId":  planetId,
-			"$learnerId": luid,
+			"$learnerId": l.Uid,
 		})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -91,30 +93,30 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 		}
 
 		// Check if planet visited
-		var l Learner
+		var updateLearner Learner
 		if len(d.CheckPlanetVisited) == 0 {
 			// Planet not visited
-			l = Learner{
-				Uid:    luid,
-				Energy: energy,
+			updateLearner = Learner{
+				Uid:    l.Uid,
+				Energy: l.Energy,
 				CurrentPlanet: LearnerPlanet{
 					Planet:         Planet{Uid: planetId},
-					Learner:        &Learner{Uid: luid},
+					Learner:        &Learner{Uid: l.Uid},
 					MinedKnowledge: 0,
 					Completed:      false,
 				},
 			}
 		} else {
-			l = Learner{
-				Uid:    luid,
-				Energy: energy,
+			updateLearner = Learner{
+				Uid:    l.Uid,
+				Energy: l.Energy,
 				CurrentPlanet: LearnerPlanet{
 					Uid: d.CheckPlanetVisited[0].Uid,
 				},
 			}
 		}
 
-		pl, err := json.Marshal(l)
+		pl, err := json.Marshal(updateLearner)
 		if err != nil {
 			fmt.Println(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -132,14 +134,12 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 			return
 		}
 
-		/*
-			err = txn.Commit(r.Context())
-			if err != nil {
-				fmt.Println(err.Error())
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		*/
+		err = txn.Commit(r.Context())
+		if err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		return
 	}
@@ -153,8 +153,11 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 
 func (s *server) handleGotoStarsystem() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		luid := r.Header.Get("X-Uid-Claim")
-		energy, _ := strconv.Atoi(r.Header.Get("X-Energy-Claim"))
+		l, ok := r.Context().Value("learner").(Learner)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		query := r.URL.Query()
 		planetId := query.Get("planetId")
@@ -171,8 +174,8 @@ func (s *server) handleGotoStarsystem() http.HandlerFunc {
 		}
 
 		// Calculate energy depletion
-		if e := energy - STARSYSTEM_ENERGY_DEPLETION; e >= 0 {
-			energy = e
+		if e := l.Energy - STARSYSTEM_ENERGY_DEPLETION; e >= 0 {
+			l.Energy = e
 		} else {
 			fmt.Println("Not enough energy")
 			http.Error(w, "Not enough energy", http.StatusBadRequest)
@@ -211,7 +214,7 @@ func (s *server) handleGotoStarsystem() http.HandlerFunc {
 		resp, err := txn.QueryWithVars(r.Context(), checkSystemNearby, map[string]string{
 			"$systemId":  systemId,
 			"$planetId":  planetId,
-			"$learnerId": luid,
+			"$learnerId": l.Uid,
 		})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -239,28 +242,28 @@ func (s *server) handleGotoStarsystem() http.HandlerFunc {
 
 		// TODO: generate planets and systems programatically
 
-		var l Learner
+		var updateLearner Learner
 		if len(d.CheckPlanetVisited) == 0 {
 			// Planet not visited
-			l = Learner{
-				Uid:    luid,
-				Energy: energy,
+			updateLearner = Learner{
+				Uid:    l.Uid,
+				Energy: l.Energy,
 				CurrentPlanet: LearnerPlanet{
 					Planet:         Planet{Uid: planetId},
-					Learner:        &Learner{Uid: luid},
+					Learner:        &Learner{Uid: l.Uid},
 					MinedKnowledge: 0,
 					Completed:      false,
 				},
 			}
 		} else {
-			l = Learner{
-				Uid:           luid,
-				Energy:        energy,
+			updateLearner = Learner{
+				Uid:           l.Uid,
+				Energy:        l.Energy,
 				CurrentPlanet: LearnerPlanet{Uid: d.CheckPlanetVisited[0].Uid},
 			}
 		}
 
-		pl, err := json.Marshal(l)
+		pl, err := json.Marshal(updateLearner)
 		if err != nil {
 			fmt.Println(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -278,14 +281,13 @@ func (s *server) handleGotoStarsystem() http.HandlerFunc {
 			return
 		}
 
-		/*
-			err = txn.Commit(r.Context())
-			if err != nil {
-				fmt.Println(err.Error())
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		*/
+		err = txn.Commit(r.Context())
+		if err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		return
 	}
 }

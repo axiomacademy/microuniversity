@@ -63,14 +63,13 @@ func (s *server) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.Background()
-		client, err := s.fb.Auth(ctx)
+		client, err := s.fb.Auth(r.Context())
 		if err != nil {
 			http.Error(w, "Error validating auth token", http.StatusInternalServerError)
 			return
 		}
 
-		token, err := client.VerifyIDToken(ctx, reqToken)
+		token, err := client.VerifyIDToken(r.Context(), reqToken)
 		if err != nil {
 			fmt.Println(err.Error())
 			http.Error(w, "Auth token invalid", http.StatusForbidden)
@@ -81,9 +80,9 @@ func (s *server) authMiddleware(next http.Handler) http.Handler {
 		email := token.Claims["email"].(string)
 
 		// Retrieve the uid
-		const userUid = `
-			query userUid($email: string) {
-					userUid(func: eq(Learner.email, $email)) {
+		const learner = `
+			query learner($email: string) {
+					learner(func: eq(Learner.email, $email)) {
 						uid
 						Learner.coins
 						Learner.energy
@@ -94,7 +93,7 @@ func (s *server) authMiddleware(next http.Handler) http.Handler {
 		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
-		resp, err := txn.QueryWithVars(r.Context(), userUid, map[string]string{
+		resp, err := txn.QueryWithVars(r.Context(), learner, map[string]string{
 			"$email": email,
 		})
 		if err != nil {
@@ -103,11 +102,7 @@ func (s *server) authMiddleware(next http.Handler) http.Handler {
 		}
 
 		var decode struct {
-			UserUid []struct {
-				Uid    string
-				Coins  int `json:"Learner.coins,omitempty"`
-				Energy int `json:"Learner.energy,omitempty"`
-			}
+			Learner []Learner
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &decode); err != nil {
@@ -115,12 +110,17 @@ func (s *server) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		fmt.Println(decode.UserUid[0].Uid)
+		if len(decode.Learner) == 0 {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		l := decode.Learner[0]
+		fmt.Println(l.Uid)
 
 		r.Header.Set("X-User-Claim", email)
-		r.Header.Set("X-Uid-Claim", decode.UserUid[0].Uid)
-		r.Header.Set("X-Coins-Claim", fmt.Sprint(decode.UserUid[0].Coins))
-		r.Header.Set("X-Energy-Claim", fmt.Sprint(decode.UserUid[0].Energy))
-		next.ServeHTTP(w, r)
+
+		ctx := context.WithValue(r.Context(), "learner", l)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

@@ -16,7 +16,12 @@ import (
 // 2. Cofigure the repeat count to be decremented until 0
 func (s *server) handlePassReviewCard() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		luid := r.Header.Get("X-Uid-Claim")
+		l, ok := r.Context().Value("learner").(Learner)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
 		query := r.URL.Query()
 		reviewCardId := query.Get("reviewCardId")
 
@@ -34,7 +39,7 @@ func (s *server) handlePassReviewCard() http.HandlerFunc {
 
 		resp, err := txn.QueryWithVars(r.Context(), getReviewCard, map[string]string{
 			"$reviewCardId": reviewCardId,
-			"$learnerId":    luid,
+			"$learnerId":    l.Uid,
 		})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -112,7 +117,12 @@ func (s *server) handlePassReviewCard() http.HandlerFunc {
 // * Set the repeat count to 3
 func (s *server) handleFailReviewCard() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		luid := r.Header.Get("X-Uid-Claim")
+		l, ok := r.Context().Value("learner").(Learner)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
 		query := r.URL.Query()
 		reviewCardId := query.Get("reviewCardId")
 
@@ -130,7 +140,7 @@ func (s *server) handleFailReviewCard() http.HandlerFunc {
 
 		resp, err := txn.QueryWithVars(r.Context(), getReviewCard, map[string]string{
 			"$reviewCardId": reviewCardId,
-			"$learnerId":    luid,
+			"$learnerId":    l.Uid,
 		})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -200,17 +210,21 @@ func (s *server) handleFailReviewCard() http.HandlerFunc {
 // * Sets last completed to the current time
 func (s *server) handleCompleteReview() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		luid := r.Header.Get("X-Uid-Claim")
+		l, ok := r.Context().Value("learner").(Learner)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
-		l := Learner{
-			Uid:           luid,
+		updateLearner := Learner{
+			Uid:           l.Uid,
 			LastCompleted: time.Now().UTC(),
 		}
 
 		txn := s.dg.NewTxn()
 		defer txn.Discard(r.Context())
 
-		pb, err := json.Marshal(l)
+		pb, err := json.Marshal(updateLearner)
 		if err != nil {
 			fmt.Println(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -249,7 +263,11 @@ func (s *server) handleCompleteReview() http.HandlerFunc {
 // 4. If repeat < 20, select a random number of other cards to make the number 20
 func (s *server) handleDailyReview() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		luid := r.Header.Get("X-Uid-Claim")
+		l, ok := r.Context().Value("learner").(Learner)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		const checkLastCompleted = `
 		query checkLastCompleted($learnerId: string) {
@@ -264,7 +282,7 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), checkLastCompleted, map[string]string{
-			"$learnerId": luid,
+			"$learnerId": l.Uid,
 		})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -373,7 +391,7 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 	`
 
 		resp, err = txn.QueryWithVars(r.Context(), getExistingReview, map[string]string{
-			"$learnerId": luid,
+			"$learnerId": l.Uid,
 			"$today":     d2.Format(time.RFC3339),
 		})
 		if err != nil {

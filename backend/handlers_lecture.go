@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/dgraph-io/dgo/v200/protos/api"
 )
@@ -14,7 +13,11 @@ import (
 // 1. Fetches all the completed lectures whose direct pre-reqs/post-reqs are incomplete
 func (s *server) handleRecommendedLectures() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		luid := r.Header.Get("X-Uid-Claim")
+		l, ok := r.Context().Value("learner").(Learner)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		const getRecommendedLectures = `
 		query getRecommendedLectures($learnerId: string) {
@@ -42,7 +45,7 @@ func (s *server) handleRecommendedLectures() http.HandlerFunc {
 		defer txn.Discard(r.Context())
 
 		resp, err := txn.QueryWithVars(r.Context(), getRecommendedLectures, map[string]string{
-			"$learnerId": luid,
+			"$learnerId": l.Uid,
 		})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -99,8 +102,11 @@ func (s *server) handleRecommendedLectures() http.HandlerFunc {
 // 5. Mark lecture as complete and deplete energy
 func (s *server) handleCompleteLecture() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		luid := r.Header.Get("X-Uid-Claim")
-		energy, _ := strconv.Atoi(r.Header.Get("X-Energy-Claim"))
+		l, ok := r.Context().Value("learner").(Learner)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		query := r.URL.Query()
 		lectureId := query.Get("lectureId")
@@ -111,8 +117,8 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 		}
 
 		// Calculate energy depletion
-		if e := energy - LECTURE_ENERGY_DEPLETION; e >= 0 {
-			energy = e
+		if e := l.Energy - LECTURE_ENERGY_DEPLETION; e >= 0 {
+			l.Energy = e
 		} else {
 			fmt.Println("Not enough energy")
 			http.Error(w, "Not enough energy", http.StatusBadRequest)
@@ -134,7 +140,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 
 		resp, err := txn.QueryWithVars(r.Context(), getLearner, map[string]string{
 			"$lectureId": lectureId,
-			"$learnerId": luid,
+			"$learnerId": l.Uid,
 		})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -163,7 +169,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 		lecture := Lecture{
 			Uid: lectureId,
 			CompletedLearners: []Learner{{
-				Uid: luid,
+				Uid: l.Uid,
 			}},
 		}
 
@@ -208,7 +214,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 
 		resp, err = txn.QueryWithVars(r.Context(), lCards, map[string]string{
 			"$lectureId": lectureId,
-			"$learnerId": luid,
+			"$learnerId": l.Uid,
 		})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -245,7 +251,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 			for _, challenge := range filteredChallenges {
 				c := LearnerChallenge{
 					DType:     []string{"LearnerChallenge"},
-					Learner:   Learner{Uid: luid},
+					Learner:   Learner{Uid: l.Uid},
 					Challenge: Challenge{Uid: challenge.Uid},
 					Status:    "UNLOCKED",
 				}
@@ -269,7 +275,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 				p := LearnerReviewCard{
 					DType: []string{"LearnerReviewCard"},
 					Learner: Learner{
-						Uid: luid,
+						Uid: l.Uid,
 					},
 					ReviewCard: ReviewCard{
 						Uid: card.Uid,
@@ -332,7 +338,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 
 		resp, err = txn.QueryWithVars(r.Context(), lCardsAndChallenges, map[string]string{
 			"$lectureId": lectureId,
-			"$learnerId": luid,
+			"$learnerId": l.Uid,
 		})
 
 		if err != nil {
@@ -354,9 +360,9 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 		}
 
 		// Adding the reverse edges
-		l := Learner{
-			Uid:        luid,
-			Energy:     energy,
+		updateLearner := Learner{
+			Uid:        l.Uid,
+			Energy:     l.Energy,
 			Cards:      d2.LearnerReviewCards,
 			Challenges: d2.LearnerChallenges,
 			CompletedLectures: []Lecture{{
@@ -364,7 +370,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 			}},
 		}
 
-		pl, err := json.Marshal(l)
+		pl, err := json.Marshal(updateLearner)
 		if err != nil {
 			fmt.Println(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)

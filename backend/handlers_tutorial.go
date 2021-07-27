@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/dgraph-io/dgo/v200/protos/api"
 )
@@ -17,8 +16,11 @@ import (
 // 4. If there is no unfilled cohort, create a new cohort and add them in
 func (s *server) handleEnrollTutorial() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		luid := r.Header.Get("X-Uid-Claim")
-		energy, _ := strconv.Atoi(r.Header.Get("X-Energy-Claim"))
+		l, ok := r.Context().Value("learner").(Learner)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		query := r.URL.Query()
 		tutorialId := query.Get("tutorialId")
@@ -29,8 +31,8 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 		}
 
 		// Calculate energy depletion
-		if e := energy - TUTORIAL_ENERGY_DEPLETION; e >= 0 {
-			energy = e
+		if e := l.Energy - TUTORIAL_ENERGY_DEPLETION; e >= 0 {
+			l.Energy = e
 		} else {
 			fmt.Println("Not enough energy")
 			http.Error(w, "Not enough energy", http.StatusBadRequest)
@@ -53,7 +55,7 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 
 		resp, err := txn.QueryWithVars(r.Context(), checkIfTutorialUnlocked, map[string]string{
 			"$tutorialId": tutorialId,
-			"$learnerId":  luid,
+			"$learnerId":  l.Uid,
 		})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -116,8 +118,8 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 				},
 				Status: "FILLING",
 				Members: []Learner{
-					Learner{
-						Uid: luid,
+					{
+						Uid: l.Uid,
 					},
 				},
 			}
@@ -128,8 +130,8 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 				},
 				Status: "FILLING",
 				Members: []Learner{
-					Learner{
-						Uid: luid,
+					{
+						Uid: l.Uid,
 					},
 				},
 			}
@@ -139,9 +141,9 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 			}
 		}
 
-		l := Learner{
-			Uid:    luid,
-			Energy: energy,
+		updateLearner := Learner{
+			Uid:    l.Uid,
+			Energy: l.Energy,
 			ActiveCohorts: []TutorialCohort{
 				tc,
 			},
@@ -154,7 +156,7 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 			return
 		}
 
-		createLearnerLink, err := json.Marshal(l)
+		createLearnerLink, err := json.Marshal(updateLearner)
 		if err != nil {
 			fmt.Println(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -178,14 +180,12 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 			return
 		}
 
-		/*
-			err = txn.Commit(r.Context())
-			if err != nil {
-				fmt.Println(err.Error())
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		*/
+		err = txn.Commit(r.Context())
+		if err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		w.Write([]byte("true"))
 		return

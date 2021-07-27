@@ -40,7 +40,7 @@ func main() {
 	}
 }
 
-// etup dependencies for the server and run it
+// Setup dependencies for the server and run it
 func run() error {
 
 	log.Print("Server initialising...")
@@ -81,7 +81,9 @@ func run() error {
 	return nil
 }
 
-/********* UTILITIES **************/
+/*
+ * Utilities
+ */
 func checkEnvVariable(env string) {
 	if env == "" {
 		log.Panic("Some environmental variables are not populated")

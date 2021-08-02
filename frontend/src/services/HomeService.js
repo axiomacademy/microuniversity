@@ -35,7 +35,6 @@ const getCoreDataQuery = `
         completed,
         planet {
           name,
-          totalKnowledge,
           starSystem {
             name,
           }

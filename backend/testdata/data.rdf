@@ -1,0 +1,148 @@
+################ SUBJECTS ######################
+
+<1> <dgraph.type> "Subject" .
+<1> <Subject.name> "Science" .
+
+<2> <dgraph.type> "Subject" .
+<2> <Subject.name> "Technology" .
+
+<3> <dgraph.type> "Subject" .
+<3> <Subject.name> "Arts" .
+
+<4> <dgraph.type> "Subject" .
+<4> <Subject.name> "Humanities" .
+
+<5> <dgraph.type> "Subject" .
+<5> <Subject.name> "Mathematics" .
+
+################ UNIVERSE ####################
+
+# The Solar System
+<6> <dgraph.type> "StarSystem" .
+<6> <StarSystem.name> "The Solar System" .
+<6> <StarSystem.nearbySystems> <10> .
+
+<7> <dgraph.type> "Planet" .
+<7> <Planet.name> "Earth" .
+<7> <Planet.starSystem> <6> .
+
+<8> <dgraph.type> "Planet" .
+<8> <Planet.name> "Venus" .
+<8> <Planet.starSystem> <6> .
+
+<9> <dgraph.type> "Planet" .
+<9> <Planet.name> "Mars" .
+<9> <Planet.starSystem> <6> .
+
+<6> <StarSystem.planets> <7> .
+<6> <StarSystem.planets> <8> .
+<6> <StarSystem.planets> <9> .
+
+# Chitauri System
+<10> <dgraph.type> "StarSystem" .
+<10> <StarSystem.name> "Chitauri System" .
+<10> <StarSystem.nearbySystems> <6> .
+
+<11> <dgraph.type> "Planet" .
+<11> <Planet.name> "Anvivis" .
+<11> <Planet.starSystem> <10> .
+
+<12> <dgraph.type> "Planet" .
+<12> <Planet.name> "Ganzao" .
+<12> <Planet.starSystem> <10> .
+
+<10> <StarSystem.planets> <11> .
+<10> <StarSystem.planets> <12> .
+
+################ LECTURE CONTENT ###################
+
+# Define the topic
+<22> <dgraph.type> "Topic" .
+<22> <Topic.name> "Introduction to Computer Architecture" .
+<22> <Topic.label> "C-0001" .
+<22> <Topic.subject> <2> .
+
+
+# Define the tutorial
+<13> <dgraph.type> "Tutorial" .
+<13> <Tutorial.title> "Build a 8-bit computer" .
+<13> <Tutorial.label> "C-0001-201" .
+<13> <Tutorial.requiredChallenges> <19> .
+<13> <Tutorial.requiredChallenges> <20> .
+<13> <Tutorial.requiredChallenges> <21> .
+
+
+# Define the lectures
+<14> <dgraph.type> "Lecture" .
+<14> <Lecture.name> "Early Computing" .
+<14> <Lecture.label> "C-0001-001" .
+<14> <Lecture.topic> <22> .
+<14> <Lecture.description> "test content 1" .
+<14> <Lecture.videoLink> "https://www.youtube.com/embed/O5nskjZ_GoI" .
+
+<15> <dgraph.type> "Lecture" .
+<15> <Lecture.name> "Electronic Computing" .
+<15> <Lecture.label> "C-0001-002" .
+<15> <Lecture.topic> <22> .
+<15> <Lecture.description> "test content 1" .
+<15> <Lecture.videoLink> "https://www.youtube.com/embed/LN0ucKNX0hc" .
+
+<16> <dgraph.type> "Lecture" .
+<16> <Lecture.name> "Boolean Logic & Logic Gates" .
+<16> <Lecture.label> "C-0001-003" .
+<16> <Lecture.topic> <22> .
+<16> <Lecture.description> "test content 1" .
+<16> <Lecture.videoLink> "https://www.youtube.com/embed/gI-qXk7XojA" .
+
+<17> <dgraph.type> "Lecture" .
+<17> <Lecture.name> "Representing Numbers and Letters with Binary" .
+<17> <Lecture.label> "C-0001-004" .
+<17> <Lecture.topic> <22> .
+<17> <Lecture.description> "test content 1" .
+<17> <Lecture.videoLink> "https://www.youtube.com/embed/1GSjbWt0c9M" .
+
+<18> <dgraph.type> "Lecture" .
+<18> <Lecture.name> "How Computers Calculate - the ALU" .
+<18> <Lecture.label> "C-0001-005" .
+<18> <Lecture.topic> <22> .
+<18> <Lecture.description> "test content 1" .
+<18> <Lecture.videoLink> "https://www.youtube.com/embed/1I5ZMmrOfnA" .
+
+
+# Define the challenges
+<19> <dgraph.type> "Challenge" .
+<19> <Challenge.title> "Messing with Digital Logic" .
+<19> <Challenge.label> "C-0001-101" .
+<19> <Challenge.description> "Build any digital logic circuit using AND and OR gates." .
+<19> <Challenge.requiredLectures> <14> .
+<19> <Challenge.requiredLectures> <15> .
+<19> <Challenge.requiredLectures> <16> .
+
+<20> <dgraph.type> "Challenge" .
+<20> <Challenge.title> "Decode a bar code" .
+<20> <Challenge.label> "C-0001-102" .
+<20> <Challenge.description> "Decode the provided bar code" .
+<20> <Challenge.requiredLectures> <17> .
+
+<21> <dgraph.type> "Challenge" .
+<21> <Challenge.title> "Design and build a full-adder" .
+<21> <Challenge.label> "C-0001-103" .
+<21> <Challenge.description> "testestest" .
+<21> <Challenge.requiredLectures> <18> .
+
+############### LEARNER1 ############### 
+
+<23> <dgraph.type> "Learner" .
+<23> <Learner.email> "testuser@gmail.com" .
+<23> <Learner.firstName> "Shan" .
+<23> <Learner.lastName> "Test" .
+<23> <Learner.energy> "100" .
+<23> <Learner.coins> "100".
+
+<24> <dgraph.type> "LearnerPlanet" .
+<24> <LearnerPlanet.completed> "false" .
+<24> <LearnerPlanet.learner> <23> .
+<24> <LearnerPlanet.minedKnowledge> "20" .
+<24> <LearnerPlanet.planet> <7> .
+
+<23> <Learner.currentPlanet> <24> .

@@ -219,14 +219,14 @@ export default {
   computed: {
     progressBarStyle: function() {
       return {
-        width: (this.coreData.currentPlanet.minedKnowledge / this.coreData.currentPlanet.planet.totalKnowledge) * 100 + '%'
+        width: this.coreData.currentPlanet.minedKnowledge + '%'
       }
     },
     activeChallenge: function() {
-      return this.coreData.challenges.filter((challenge) => challenge.status == "INPROGRESS")
+      return this.testChallenges.filter((challenge) => challenge.status == "INPROGRESS")
     },
     availableChallenges: function() {
-      return this.coreData.challenges.filter((challenge) => challenge.status == "UNLOCKED")
+      return this.testChallenges.filter((challenge) => challenge.status == "UNLOCKED")
     },
     // Tab State Handlers
     learnTabOpen: function () {
@@ -259,7 +259,7 @@ export default {
         localStorage.setItem("FB_TOKEN", this.token)
         localStorage.setItem("EMAIL", user.email)
 
-        // Get the core data
+        // Get the core data 
         let res = await getCoreData(this.token, this.email)
         this.coreData = res.data.getLearner
         console.log(this.coreData)

@@ -15,12 +15,7 @@ import (
 // 3. Set currentPlanet to the new planet, and subtract energy costs
 func (s *server) handleGotoPlanet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l, ok := r.Context().Value("learner").(Learner)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
+		l := r.Context().Value("learner").(Learner)
 		query := r.URL.Query()
 		planetId := query.Get("planetId")
 
@@ -33,7 +28,7 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 		if e := l.Energy - PLANET_ENERGY_DEPLETION; e >= 0 {
 			l.Energy = e
 		} else {
-			fmt.Println("Not enough energy")
+			s.logger.Info("Not enough energy")
 			http.Error(w, "Not enough energy", http.StatusBadRequest)
 			return
 		}
@@ -69,7 +64,7 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 			"$learnerId": l.Uid,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Debug(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -80,14 +75,14 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &d); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Debug(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		// If there's nothing means it's not nearby
 		if len(d.CheckPlanetNearby) == 0 {
-			fmt.Println("Planet not nearby")
+			s.logger.Info("Planet not nearby")
 			http.Error(w, "Planet not nearby", http.StatusBadRequest)
 			return
 		}
@@ -118,7 +113,7 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 
 		pl, err := json.Marshal(updateLearner)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -129,14 +124,14 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 
 		_, err = txn.Mutate(r.Context(), mu)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		err = txn.Commit(r.Context())
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

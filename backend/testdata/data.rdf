@@ -1,144 +1,148 @@
 ################ SUBJECTS ######################
 
-_:science <dgraph.type> "Subject" .
-_:science <Subject.name> "Science" .
+<1> <dgraph.type> "Subject" .
+<1> <Subject.name> "Science" .
 
-_:tech <dgraph.type> "Subject" .
-_:tech <Subject.name> "Technology" .
+<2> <dgraph.type> "Subject" .
+<2> <Subject.name> "Technology" .
 
-_:arts <dgraph.type> "Subject" .
-_:arts <Subject.name> "Arts" .
+<3> <dgraph.type> "Subject" .
+<3> <Subject.name> "Arts" .
 
-_:humans <dgraph.type> "Subject" .
-_:humans <Subject.name> "Humanities" .
+<4> <dgraph.type> "Subject" .
+<4> <Subject.name> "Humanities" .
 
-_:math <dgraph.type> "Subject" .
-_:math <Subject.name> "Mathematics" .
+<5> <dgraph.type> "Subject" .
+<5> <Subject.name> "Mathematics" .
 
 ################ UNIVERSE ####################
 
 # The Solar System
-_:solarsystem <dgraph.type> "StarSystem" .
-_:solarsystem <StarSystem.name> "The Solar System" .
-_:solarsystem <StarSystem.nearbySystems> _:chitaurisystem .
+<6> <dgraph.type> "StarSystem" .
+<6> <StarSystem.name> "The Solar System" .
+<6> <StarSystem.nearbySystems> <10> .
 
-_:earth <dgraph.type> "Planet" .
-_:earth <Planet.name> "Earth" .
-_:earth <Planet.starSystem> _:solarsystem .
+<7> <dgraph.type> "Planet" .
+<7> <Planet.name> "Earth" .
+<7> <Planet.starSystem> <6> .
 
-_:venus <dgraph.type> "Planet" .
-_:venus <Planet.name> "Venus" .
-_:venus <Planet.starSystem> _:solarsystem .
+<8> <dgraph.type> "Planet" .
+<8> <Planet.name> "Venus" .
+<8> <Planet.starSystem> <6> .
 
-_:mars <dgraph.type> "Planet" .
-_:mars <Planet.name> "Mars" .
-_:mars <Planet.starSystem> _:solarsystem .
+<9> <dgraph.type> "Planet" .
+<9> <Planet.name> "Mars" .
+<9> <Planet.starSystem> <6> .
 
-_:solarsystem <StarSystem.planets> _:earth .
-_:solarsystem <StarSystem.planets> _:venus .
-_:solarsystem <StarSystem.planets> _:mars .
+<6> <StarSystem.planets> <7> .
+<6> <StarSystem.planets> <8> .
+<6> <StarSystem.planets> <9> .
 
 # Chitauri System
-_:chitaurisystem <dgraph.type> "StarSystem" .
-_:chitaurisystem <StarSystem.name> "Chitauri System" .
-_:chitaurisystem <StarSystem.nearbySystems> _:solarsystem .
+<10> <dgraph.type> "StarSystem" .
+<10> <StarSystem.name> "Chitauri System" .
+<10> <StarSystem.nearbySystems> <6> .
 
-_:anvivis <dgraph.type> "Planet" .
-_:anvivis <Planet.name> "Anvivis" .
-_:anvivis <Planet.starSystem> _:chitaurisystem .
+<11> <dgraph.type> "Planet" .
+<11> <Planet.name> "Anvivis" .
+<11> <Planet.starSystem> <10> .
 
-_:ganzao <dgraph.type> "Planet" .
-_:ganzao <Planet.name> "Ganzao" .
-_:ganzao <Planet.starSystem> _:chitaurisystem .
+<12> <dgraph.type> "Planet" .
+<12> <Planet.name> "Ganzao" .
+<12> <Planet.starSystem> <10> .
 
-_:chitaurisystem <StarSystem.planets> _:anvivis .
-_:chitaurisystem <StarSystem.planets> _:ganzao .
+<10> <StarSystem.planets> <11> .
+<10> <StarSystem.planets> <12> .
 
 ################ LECTURE CONTENT ###################
 
 # Define the topic
-_:c-0001 <dgraph.type> "Topic" .
-_:c-0001 <Topic.name> "Introduction to Computer Architecture" .
-_:c-0001 <Topic.label> "C-0001" .
-_:c-0001 <Topic.subject> _:tech .
+<22> <dgraph.type> "Topic" .
+<22> <Topic.name> "Introduction to Computer Architecture" .
+<22> <Topic.label> "C-0001" .
+<22> <Topic.subject> <2> .
 
 
 # Define the tutorial
-_:c-0001-201 <dgraph.type> "Tutorial" .
-_:c-0001-201 <Tutorial.title> "Build a 8-bit computer" .
-_:c-0001-201 <Tutorial.label> "C-0001-201" .
-_:c-0001-201 <Tutorial.requiredChallenges> _:c-0001-101 .
-_:c-0001-201 <Tutorial.requiredChallenges> _:c-0001-102 .
-_:c-0001-201 <Tutorial.requiredChallenges> _:c-0001-103 .
+<13> <dgraph.type> "Tutorial" .
+<13> <Tutorial.title> "Build a 8-bit computer" .
+<13> <Tutorial.label> "C-0001-201" .
+<13> <Tutorial.requiredChallenges> <19> .
+<13> <Tutorial.requiredChallenges> <20> .
+<13> <Tutorial.requiredChallenges> <21> .
 
 
 # Define the lectures
-_:c-0001-001 <dgraph.type> "Lecture" .
-_:c-0001-001 <Lecture.name> "Early Computing" .
-_:c-0001-001 <Lecture.label> "C-0001-001" .
-_:c-0001-001 <Lecture.topic> _:c-0001 .
-_:c-0001-001 <Lecture.description> "test content 1" .
-_:c-0001-001 <Lecture.videoLink> "https://www.youtube.com/embed/O5nskjZ_GoI" .
+<14> <dgraph.type> "Lecture" .
+<14> <Lecture.name> "Early Computing" .
+<14> <Lecture.label> "C-0001-001" .
+<14> <Lecture.topic> <22> .
+<14> <Lecture.description> "test content 1" .
+<14> <Lecture.videoLink> "https://www.youtube.com/embed/O5nskjZ_GoI" .
 
-_:c-0001-002 <dgraph.type> "Lecture" .
-_:c-0001-002 <Lecture.name> "Electronic Computing" .
-_:c-0001-002 <Lecture.label> "C-0001-002" .
-_:c-0001-002 <Lecture.topic> _:c-0001 .
-_:c-0001-002 <Lecture.description> "test content 1" .
-_:c-0001-002 <Lecture.videoLink> "https://www.youtube.com/embed/LN0ucKNX0hc" .
+<15> <dgraph.type> "Lecture" .
+<15> <Lecture.name> "Electronic Computing" .
+<15> <Lecture.label> "C-0001-002" .
+<15> <Lecture.topic> <22> .
+<15> <Lecture.description> "test content 1" .
+<15> <Lecture.videoLink> "https://www.youtube.com/embed/LN0ucKNX0hc" .
 
-_:c-0001-003 <dgraph.type> "Lecture" .
-_:c-0001-003 <Lecture.name> "Boolean Logic & Logic Gates" .
-_:c-0001-003 <Lecture.label> "C-0001-003" .
-_:c-0001-003 <Lecture.topic> _:c-0001 .
-_:c-0001-003 <Lecture.description> "test content 1" .
-_:c-0001-003 <Lecture.videoLink> "https://www.youtube.com/embed/gI-qXk7XojA" .
+<16> <dgraph.type> "Lecture" .
+<16> <Lecture.name> "Boolean Logic & Logic Gates" .
+<16> <Lecture.label> "C-0001-003" .
+<16> <Lecture.topic> <22> .
+<16> <Lecture.description> "test content 1" .
+<16> <Lecture.videoLink> "https://www.youtube.com/embed/gI-qXk7XojA" .
 
-_:c-0001-004 <dgraph.type> "Lecture" .
-_:c-0001-004 <Lecture.name> "Representing Numbers and Letters with Binary" .
-_:c-0001-004 <Lecture.label> "C-0001-004" .
-_:c-0001-004 <Lecture.topic> _:c-0001 .
-_:c-0001-004 <Lecture.description> "test content 1" .
-_:c-0001-004 <Lecture.videoLink> "https://www.youtube.com/embed/1GSjbWt0c9M" .
+<17> <dgraph.type> "Lecture" .
+<17> <Lecture.name> "Representing Numbers and Letters with Binary" .
+<17> <Lecture.label> "C-0001-004" .
+<17> <Lecture.topic> <22> .
+<17> <Lecture.description> "test content 1" .
+<17> <Lecture.videoLink> "https://www.youtube.com/embed/1GSjbWt0c9M" .
 
-_:c-0001-005 <dgraph.type> "Lecture" .
-_:c-0001-005 <Lecture.name> "How Computers Calculate - the ALU" .
-_:c-0001-005 <Lecture.label> "C-0001-005" .
-_:c-0001-005 <Lecture.topic> _:c-0001 .
-_:c-0001-005 <Lecture.description> "test content 1" .
-_:c-0001-005 <Lecture.videoLink> "https://www.youtube.com/embed/1I5ZMmrOfnA" .
+<18> <dgraph.type> "Lecture" .
+<18> <Lecture.name> "How Computers Calculate - the ALU" .
+<18> <Lecture.label> "C-0001-005" .
+<18> <Lecture.topic> <22> .
+<18> <Lecture.description> "test content 1" .
+<18> <Lecture.videoLink> "https://www.youtube.com/embed/1I5ZMmrOfnA" .
 
 
 # Define the challenges
-_:c-0001-101 <dgraph.type> "Challenge" .
-_:c-0001-101 <Challenge.title> "Messing with Digital Logic" .
-_:c-0001-101 <Challenge.label> "C-0001-101" .
-_:c-0001-101 <Challenge.description> "Build any digital logic circuit using AND and OR gates." .
-_:c-0001-101 <Challenge.requiredLectures> _:c-0001-001 .
-_:c-0001-101 <Challenge.requiredLectures> _:c-0001-002 .
-_:c-0001-101 <Challenge.requiredLectures> _:c-0001-003 .
+<19> <dgraph.type> "Challenge" .
+<19> <Challenge.title> "Messing with Digital Logic" .
+<19> <Challenge.label> "C-0001-101" .
+<19> <Challenge.description> "Build any digital logic circuit using AND and OR gates." .
+<19> <Challenge.requiredLectures> <14> .
+<19> <Challenge.requiredLectures> <15> .
+<19> <Challenge.requiredLectures> <16> .
 
-_:c-0001-102 <dgraph.type> "Challenge" .
-_:c-0001-102 <Challenge.title> "Decode a bar code" .
-_:c-0001-102 <Challenge.label> "C-0001-102" .
-_:c-0001-102 <Challenge.description> "Decode the provided bar code" .
-_:c-0001-102 <Challenge.requiredLectures> _:c-0001-004 .
+<20> <dgraph.type> "Challenge" .
+<20> <Challenge.title> "Decode a bar code" .
+<20> <Challenge.label> "C-0001-102" .
+<20> <Challenge.description> "Decode the provided bar code" .
+<20> <Challenge.requiredLectures> <17> .
 
-_:c-0001-103 <dgraph.type> "Challenge" .
-_:c-0001-103 <Challenge.title> "Design and build a full-adder" .
-_:c-0001-103 <Challenge.label> "C-0001-103" .
-_:c-0001-103 <Challenge.description> "testestest" .
-_:c-0001-103 <Challenge.requiredLectures> _:c-0001-005 .
+<21> <dgraph.type> "Challenge" .
+<21> <Challenge.title> "Design and build a full-adder" .
+<21> <Challenge.label> "C-0001-103" .
+<21> <Challenge.description> "testestest" .
+<21> <Challenge.requiredLectures> <18> .
 
 ############### LEARNER1 ############### 
 
-_:learner1 <dgraph.type> "Learner" .
-_:learner1 <Learner.email> "testuser@gmail.com" .
-_:learner1 <Learner.firstName> "Shan" .
-_:learner1 <Learner.lastName> "Test" .
-_:learner1 <Learner.energy> "100" .
-_:learner1 <Learner.coins> "100".
-_:learner1 <Learner.currentPlanet> _:earth .
+<23> <dgraph.type> "Learner" .
+<23> <Learner.email> "testuser@gmail.com" .
+<23> <Learner.firstName> "Shan" .
+<23> <Learner.lastName> "Test" .
+<23> <Learner.energy> "100" .
+<23> <Learner.coins> "100".
 
+<24> <dgraph.type> "LearnerPlanet" .
+<24> <LearnerPlanet.completed> "false" .
+<24> <LearnerPlanet.learner> <23> .
+<24> <LearnerPlanet.minedKnowledge> "20" .
+<24> <LearnerPlanet.planet> <7> .
 
-
+<23> <Learner.currentPlanet> <24> .

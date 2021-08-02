@@ -34,21 +34,12 @@ func newTestDb() *testDb {
 		dg: dg,
 	}
 
-	db.Populate()
+	db.loadFile("./testdata/data.rdf")
 	return db
 }
 
-// Populate database with the test data
-func (db *testDb) Populate() {
-	db.loadFile("./testdata/C-0001.rdf")
-	db.loadFile("./testdata/subjects.rdf")
-	db.loadFile("./testdata/universe.rdf")
-}
-
 func (db *testDb) Teardown() {
-	op := &api.Operation{
-		DropAll: true,
-	}
+	op := &api.Operation{DropOp: api.Operation_DATA}
 
 	if err := db.dg.Alter(context.Background(), op); err != nil {
 		panic(fmt.Sprintf("Could not cleanup database. Got error %v", err.Error()))

@@ -113,8 +113,8 @@ func (s *server) handlePassReviewCard() http.HandlerFunc {
 
 // Fail Review Card
 // Requires: learnerId, reviewCardId
-// * Remove review card from daily list
-// * Set the repeat count to 3
+// 1. Remove review card from daily list
+// 2. Set the repeat count to 3
 func (s *server) handleFailReviewCard() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		l, ok := r.Context().Value("learner").(Learner)

@@ -11,6 +11,7 @@ import (
 	"github.com/dgraph-io/dgo/v200"
 	"github.com/dgraph-io/dgo/v200/protos/api"
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 )
@@ -42,8 +43,11 @@ func main() {
 
 // Setup dependencies for the server and run it
 func run() error {
+	// Setting up the logger
+	logger, _ := zap.NewProduction()
+	sugar := logger.Sugar()
 
-	log.Print("Server initialising...")
+	sugar.Infow("Server initialising...")
 
 	// Getting all the environmental variables
 	DB_URL := os.Getenv("DB_URL")
@@ -72,10 +76,11 @@ func run() error {
 		dg:     dg,
 		fb:     fb,
 		router: mux.NewRouter(),
+		logger: logger,
 	}
 	s.routes()
 
-	log.Print("All setup running, and available on port 8003")
+	sugar.Infow("All setup running, and availale on port 8003")
 	http.ListenAndServe(":8003", s)
 
 	return nil

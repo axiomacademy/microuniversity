@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
@@ -58,7 +57,6 @@ func (s *server) authMiddleware(next http.Handler) http.Handler {
 		reqToken := r.Header.Get("Authorization")
 
 		if reqToken == "" {
-			fmt.Println("Pew")
 			http.Error(w, "No auth token", http.StatusForbidden)
 			return
 		}
@@ -71,7 +69,7 @@ func (s *server) authMiddleware(next http.Handler) http.Handler {
 
 		token, err := client.VerifyIDToken(r.Context(), reqToken)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, "Auth token invalid", http.StatusForbidden)
 			return
 		}
@@ -116,7 +114,7 @@ func (s *server) authMiddleware(next http.Handler) http.Handler {
 		}
 
 		l := decode.Learner[0]
-		fmt.Println(l.Uid)
+		s.logger.Info(l.Uid)
 
 		r.Header.Set("X-User-Claim", email)
 

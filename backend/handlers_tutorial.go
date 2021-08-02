@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/dgraph-io/dgo/v200/protos/api"
@@ -16,11 +15,7 @@ import (
 // 4. If there is no unfilled cohort, create a new cohort and add them in
 func (s *server) handleEnrollTutorial() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l, ok := r.Context().Value("learner").(Learner)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		l := r.Context().Value("learner").(Learner)
 
 		query := r.URL.Query()
 		tutorialId := query.Get("tutorialId")
@@ -34,7 +29,7 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 		if e := l.Energy - TUTORIAL_ENERGY_DEPLETION; e >= 0 {
 			l.Energy = e
 		} else {
-			fmt.Println("Not enough energy")
+			s.logger.Info("Not enough energy")
 			http.Error(w, "Not enough energy", http.StatusBadRequest)
 			return
 		}
@@ -58,7 +53,7 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 			"$learnerId":  l.Uid,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -68,14 +63,13 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &decode); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if len(decode.CheckIfTutorialUnlocked) != 1 {
-			fmt.Println("Oops")
-			http.Error(w, "oops", http.StatusInternalServerError)
+			http.Error(w, "Tutorial is not unlocked", http.StatusInternalServerError)
 			return
 		}
 
@@ -92,7 +86,7 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 			"$tutorialId": tutorialId,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -102,7 +96,7 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &decode1); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -151,14 +145,14 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 
 		createTutorial, err := json.Marshal(tc)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		createLearnerLink, err := json.Marshal(updateLearner)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -175,14 +169,14 @@ func (s *server) handleEnrollTutorial() http.HandlerFunc {
 
 		_, err = txn.Do(r.Context(), req)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		err = txn.Commit(r.Context())
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

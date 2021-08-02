@@ -15,11 +15,7 @@ import (
 // 2. Subtracts the energy cost and sets the challenge status to INPROGRESS
 func (s *server) handleAcceptChallenge() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l, ok := r.Context().Value("learner").(Learner)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		l := r.Context().Value("learner").(Learner)
 
 		query := r.URL.Query()
 		challengeId := query.Get("challengeId")
@@ -33,7 +29,7 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 		if e := l.Energy - CHALLENGE_ENERGY_DEPLETION; e >= 0 {
 			l.Energy = e
 		} else {
-			fmt.Println("Not enough energy")
+			s.logger.Info("Not enough energy")
 			http.Error(w, "Not enough energy", http.StatusBadRequest)
 			return
 		}
@@ -57,7 +53,7 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 			"$learnerId":   l.Uid,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Debug(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -69,19 +65,19 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &decode); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if len(decode.CheckChallengeStatus[0].Challenges) != 1 {
-			fmt.Println("Challenge doesn't exist")
+			s.logger.Info("Challenge doesn't exist")
 			http.Error(w, "Challenge doesn't exist", http.StatusInternalServerError)
 			return
 		}
 
 		if decode.CheckChallengeStatus[0].Challenges[0].Status != "UNLOCKED" {
-			fmt.Println("Incorrect challenge status")
+			s.logger.Info("Incorrect challenge status")
 			http.Error(w, "Incorrect challenge status", http.StatusBadRequest)
 			return
 		}
@@ -94,12 +90,10 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 
 		updateChallenge, err := json.Marshal(update)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		fmt.Println(string(updateChallenge))
 
 		mu := &api.Mutation{
 			SetJson: updateChallenge,
@@ -112,7 +106,7 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 
 		pl, err := json.Marshal(updateLearner)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -124,14 +118,14 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 		req := &api.Request{Mutations: []*api.Mutation{mu, mu1}}
 		_, err = txn.Do(r.Context(), req)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		err = txn.Commit(r.Context())
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -147,13 +141,10 @@ func (s *server) handleAcceptChallenge() http.HandlerFunc {
 // 3. Set challenge to complete and check for unlocked Tutorials
 // 4. Add unlocked tutorials to learner and increment current planet mining
 // 5. If planet is fully mined, and increment the coin and set planet status
+
 func (s *server) handleCompleteChallenge() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l, ok := r.Context().Value("learner").(Learner)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		l := r.Context().Value("learner").(Learner)
 
 		query := r.URL.Query()
 		challengeId := query.Get("challengeId")
@@ -198,7 +189,7 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 			"$learnerId":   l.Uid,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Debug(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -214,8 +205,8 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 		}
 
 		if len(decode.CheckIfChallengeComplete[0].Challenges) != 1 {
-			fmt.Println("Oops")
-			http.Error(w, "oops", http.StatusInternalServerError)
+			s.logger.Info("Challenge is not complete")
+			http.Error(w, "Challenge is not complete", http.StatusInternalServerError)
 			return
 		}
 
@@ -224,13 +215,13 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 
 		// Check if planet has already been completely mined
 		if currentPlanet.Completed {
-			fmt.Println("Already mined planet")
+			s.logger.Info("Already mined planet")
 			http.Error(w, "Already mined planet", http.StatusBadRequest)
 			return
 		}
 
 		if decode.CheckIfChallengeComplete[0].Challenges[0].Status == "COMPLETED" {
-			fmt.Println("Already complete")
+			s.logger.Info("Already complete")
 			http.Error(w, "Already complete", http.StatusBadRequest)
 			return
 		}
@@ -243,12 +234,10 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 
 		updateChallenge, err := json.Marshal(update)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Debug(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		fmt.Println(string(updateChallenge))
 
 		mu := &api.Mutation{
 			SetJson: updateChallenge,
@@ -256,7 +245,7 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 
 		_, err = txn.Mutate(r.Context(), mu)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Debug(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -288,42 +277,34 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 		var unlockedTutorials []Tutorial
 
 		for _, tutorial := range tutorials {
-			fmt.Println(tutorial.Uid)
 			resp, err := txn.QueryWithVars(r.Context(), getTutorialUnlocked, map[string]string{
 				"$tutorialId": tutorial.Uid,
 				"$learnerId":  l.Uid,
 			})
 			if err != nil {
-				fmt.Println(err.Error())
+				s.logger.Debug(err.Error())
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-
-			fmt.Println(resp)
 
 			var decode1 struct {
 				GetLearnerChallenges []Learner
 			}
 
 			if err := json.Unmarshal(resp.GetJson(), &decode1); err != nil {
-				fmt.Println(err.Error())
+				s.logger.Error(err.Error())
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
-			fmt.Println(decode1)
-
 			if len(decode1.GetLearnerChallenges) != 1 {
-				fmt.Println("Oops")
-				http.Error(w, "oops", http.StatusInternalServerError)
+				s.logger.Info("No learner challenge")
+				http.Error(w, "No learner challenge", http.StatusInternalServerError)
 				return
 			}
 
 			completedCount := len(decode1.GetLearnerChallenges[0].Challenges)
 			unlockCount := len(tutorial.RequiredChallenges)
-
-			fmt.Println(completedCount)
-			fmt.Println(unlockCount)
 
 			// Then we're ready to unlock
 			if completedCount == unlockCount {
@@ -353,7 +334,7 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 
 		pl, err := json.Marshal(updateLearner)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -364,14 +345,14 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 
 		_, err = txn.Mutate(r.Context(), mu1)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		err = txn.Commit(r.Context())
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -384,6 +365,7 @@ func (s *server) handleCompleteChallenge() http.HandlerFunc {
 
 		dres, err := json.Marshal(gqlTutorials)
 		if err != nil {
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

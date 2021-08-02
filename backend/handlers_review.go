@@ -16,11 +16,7 @@ import (
 // 2. Cofigure the repeat count to be decremented until 0
 func (s *server) handlePassReviewCard() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l, ok := r.Context().Value("learner").(Learner)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		l := r.Context().Value("learner").(Learner)
 
 		query := r.URL.Query()
 		reviewCardId := query.Get("reviewCardId")
@@ -42,7 +38,7 @@ func (s *server) handlePassReviewCard() http.HandlerFunc {
 			"$learnerId":    l.Uid,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -54,13 +50,13 @@ func (s *server) handlePassReviewCard() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &decode); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if len(decode.GetReviewCard) != 1 {
-			fmt.Println("Oops")
+			s.logger.Info("Oops")
 			http.Error(w, "oops", http.StatusInternalServerError)
 			return
 		}
@@ -82,7 +78,7 @@ func (s *server) handlePassReviewCard() http.HandlerFunc {
 
 		pb, err := json.Marshal(update)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -93,14 +89,14 @@ func (s *server) handlePassReviewCard() http.HandlerFunc {
 
 		_, err = txn.Mutate(r.Context(), mu)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		err = txn.Commit(r.Context())
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -117,11 +113,7 @@ func (s *server) handlePassReviewCard() http.HandlerFunc {
 // 2. Set the repeat count to 3
 func (s *server) handleFailReviewCard() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l, ok := r.Context().Value("learner").(Learner)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		l := r.Context().Value("learner").(Learner)
 
 		query := r.URL.Query()
 		reviewCardId := query.Get("reviewCardId")
@@ -143,7 +135,7 @@ func (s *server) handleFailReviewCard() http.HandlerFunc {
 			"$learnerId":    l.Uid,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -155,13 +147,13 @@ func (s *server) handleFailReviewCard() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &decode); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if len(decode.GetReviewCard) != 1 {
-			fmt.Println("Oops")
+			s.logger.Info("Oops")
 			http.Error(w, "oops", http.StatusInternalServerError)
 			return
 		}
@@ -187,14 +179,14 @@ func (s *server) handleFailReviewCard() http.HandlerFunc {
 
 		_, err = txn.Mutate(r.Context(), mu)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		err = txn.Commit(r.Context())
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -210,11 +202,7 @@ func (s *server) handleFailReviewCard() http.HandlerFunc {
 // * Sets last completed to the current time
 func (s *server) handleCompleteReview() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l, ok := r.Context().Value("learner").(Learner)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		l := r.Context().Value("learner").(Learner)
 
 		updateLearner := Learner{
 			Uid:           l.Uid,
@@ -226,7 +214,7 @@ func (s *server) handleCompleteReview() http.HandlerFunc {
 
 		pb, err := json.Marshal(updateLearner)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -237,14 +225,14 @@ func (s *server) handleCompleteReview() http.HandlerFunc {
 
 		_, err = txn.Mutate(r.Context(), mu)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		err = txn.Commit(r.Context())
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -263,11 +251,7 @@ func (s *server) handleCompleteReview() http.HandlerFunc {
 // 4. If repeat < 20, select a random number of other cards to make the number 20
 func (s *server) handleDailyReview() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l, ok := r.Context().Value("learner").(Learner)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		l := r.Context().Value("learner").(Learner)
 
 		const checkLastCompleted = `
 		query checkLastCompleted($learnerId: string) {
@@ -285,7 +269,7 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 			"$learnerId": l.Uid,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -298,13 +282,13 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &decode); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if len(decode.CheckLastCompleted) == 0 {
-			fmt.Println("User doesn't exist?")
+			s.logger.Info("User doesn't exist?")
 			http.Error(w, "User doesn't exist?", http.StatusInternalServerError)
 			return
 		}
@@ -328,8 +312,8 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 		d1 := time.Date(lastCompleted.Year(), lastCompleted.Month(), lastCompleted.Day(), 0, 0, 0, 0, lastCompleted.Location())
 		d2 := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
-		fmt.Println(d1)
-		fmt.Println(d2)
+		s.logger.Sugar().Debug(d1)
+		s.logger.Sugar().Debug(d2)
 
 		// Today's review is already completed
 		if d1.Unix() == d2.Unix() {
@@ -395,7 +379,7 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 			"$today":     d2.Format(time.RFC3339),
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -413,12 +397,10 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &decode1); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		fmt.Println(decode1.GetExistingReviewCards)
 
 		if len(decode1.GetExistingReviewCards) > 0 {
 			res := []GqlLearnerReviewCard{}
@@ -456,8 +438,8 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 		remainingCount := 20 - len(repeatCards)
 		availableCount := len(remainingCards)
 
-		fmt.Println(remainingCards)
-		fmt.Println(repeatCards)
+		s.logger.Sugar().Debug(remainingCards)
+		s.logger.Sugar().Debug(repeatCards)
 
 		if remainingCount <= 0 {
 			// Pick random 20
@@ -487,14 +469,14 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 			}
 		}
 
-		fmt.Println(selectedCards)
+		s.logger.Sugar().Debug(selectedCards)
 
 		// Mark all the selected cards
 		for _, card := range selectedCards {
 			card.Selected = d2
 			pb, err := json.Marshal(card)
 			if err != nil {
-				fmt.Println(err.Error())
+				s.logger.Error(err.Error())
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -505,7 +487,7 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 
 			_, err = txn.Mutate(r.Context(), mu)
 			if err != nil {
-				fmt.Println(err.Error())
+				s.logger.Error(err.Error())
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -513,7 +495,7 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 
 		err = txn.Commit(r.Context())
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -525,7 +507,7 @@ func (s *server) handleDailyReview() http.HandlerFunc {
 			res = append(res, card.toGql())
 		}
 
-		fmt.Println(res)
+		s.logger.Sugar().Debug(res)
 
 		// Marshal to JSON and return
 		dres, err := json.Marshal(res)

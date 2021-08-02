@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/dgraph-io/dgo/v200/protos/api"
@@ -75,7 +74,7 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &d); err != nil {
-			s.logger.Debug(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -148,11 +147,7 @@ func (s *server) handleGotoPlanet() http.HandlerFunc {
 
 func (s *server) handleGotoStarsystem() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l, ok := r.Context().Value("learner").(Learner)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		l := r.Context().Value("learner").(Learner)
 
 		query := r.URL.Query()
 		planetId := query.Get("planetId")
@@ -172,7 +167,7 @@ func (s *server) handleGotoStarsystem() http.HandlerFunc {
 		if e := l.Energy - STARSYSTEM_ENERGY_DEPLETION; e >= 0 {
 			l.Energy = e
 		} else {
-			fmt.Println("Not enough energy")
+			s.logger.Info("Not enough energy")
 			http.Error(w, "Not enough energy", http.StatusBadRequest)
 			return
 		}
@@ -212,7 +207,7 @@ func (s *server) handleGotoStarsystem() http.HandlerFunc {
 			"$learnerId": l.Uid,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Debug(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -223,14 +218,14 @@ func (s *server) handleGotoStarsystem() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &d); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		// If there's nothing means it's not nearby
 		if len(d.CheckSystemNearby) == 0 {
-			fmt.Println("System not nearby")
+			s.logger.Info("System not nearby")
 			http.Error(w, "System not nearby", http.StatusBadRequest)
 			return
 		}
@@ -260,7 +255,7 @@ func (s *server) handleGotoStarsystem() http.HandlerFunc {
 
 		pl, err := json.Marshal(updateLearner)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -271,14 +266,14 @@ func (s *server) handleGotoStarsystem() http.HandlerFunc {
 
 		_, err = txn.Mutate(r.Context(), mu)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		err = txn.Commit(r.Context())
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

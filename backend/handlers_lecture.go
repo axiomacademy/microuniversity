@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/dgraph-io/dgo/v200/protos/api"
@@ -13,11 +12,7 @@ import (
 // 1. Fetches all the completed lectures whose direct pre-reqs/post-reqs are incomplete
 func (s *server) handleRecommendedLectures() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l, ok := r.Context().Value("learner").(Learner)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		l := r.Context().Value("learner").(Learner)
 
 		const getRecommendedLectures = `
 		query getRecommendedLectures($learnerId: string) {
@@ -48,29 +43,25 @@ func (s *server) handleRecommendedLectures() http.HandlerFunc {
 			"$learnerId": l.Uid,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Debug(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		fmt.Println(string(resp.GetJson()))
 
 		var decode struct {
 			GetRecommendedLectures []Lecture `json:"getRecommendedLectures"`
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &decode); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if len(decode.GetRecommendedLectures) == 0 {
-			http.Error(w, "oops", http.StatusInternalServerError)
+			http.Error(w, "No reccomended lectures", http.StatusInternalServerError)
 			return
 		}
-
-		fmt.Println(decode)
 
 		// Return the selectedCards
 		res := []GqlLecture{}
@@ -79,11 +70,10 @@ func (s *server) handleRecommendedLectures() http.HandlerFunc {
 			res = append(res, lecture.toGql())
 		}
 
-		fmt.Println(res)
-
 		// Marshal to JSON and return
 		dres, err := json.Marshal(res)
 		if err != nil {
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -102,11 +92,7 @@ func (s *server) handleRecommendedLectures() http.HandlerFunc {
 // 5. Mark lecture as complete and deplete energy
 func (s *server) handleCompleteLecture() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l, ok := r.Context().Value("learner").(Learner)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		l := r.Context().Value("learner").(Learner)
 
 		query := r.URL.Query()
 		lectureId := query.Get("lectureId")
@@ -120,7 +106,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 		if e := l.Energy - LECTURE_ENERGY_DEPLETION; e >= 0 {
 			l.Energy = e
 		} else {
-			fmt.Println("Not enough energy")
+			s.logger.Info("Not enough energy")
 			http.Error(w, "Not enough energy", http.StatusBadRequest)
 			return
 		}
@@ -143,7 +129,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 			"$learnerId": l.Uid,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -154,14 +140,14 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &d); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		// If there's nothing means it's incomplete
 		if len(d.GetLearner) != 0 {
-			fmt.Println("Already complete")
+			s.logger.Info("Already complete")
 			http.Error(w, "Already complete", http.StatusBadRequest)
 			return
 		}
@@ -175,7 +161,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 
 		plecture, err := json.Marshal(lecture)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -186,7 +172,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 
 		_, err = txn.Mutate(r.Context(), mu2)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -217,7 +203,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 			"$learnerId": l.Uid,
 		})
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -231,7 +217,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &d1); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -258,7 +244,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 
 				pc, err := json.Marshal(c)
 				if err != nil {
-					fmt.Println(err.Error())
+					s.logger.Error(err.Error())
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
@@ -285,7 +271,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 
 				pb, err := json.Marshal(p)
 				if err != nil {
-					fmt.Println(err.Error())
+					s.logger.Error(err.Error())
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
@@ -300,7 +286,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 			req := &api.Request{Mutations: mList}
 			_, err := txn.Do(r.Context(), req)
 			if err != nil {
-				fmt.Println(err.Error())
+				s.logger.Error(err.Error())
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -342,7 +328,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 		})
 
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -354,7 +340,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(resp.GetJson(), &d2); err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -372,7 +358,7 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 
 		pl, err := json.Marshal(updateLearner)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -383,14 +369,14 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 
 		_, err = txn.Mutate(r.Context(), mu1)
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		err = txn.Commit(r.Context())
 		if err != nil {
-			fmt.Println(err.Error())
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -414,11 +400,12 @@ func (s *server) handleCompleteLecture() http.HandlerFunc {
 
 		dres, err := json.Marshal(httpRes)
 		if err != nil {
+			s.logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		fmt.Println(string(dres))
+		s.logger.Sugar().Debug("Response:", httpRes)
 
 		w.Write(dres)
 	}

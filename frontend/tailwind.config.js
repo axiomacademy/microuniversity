@@ -270,7 +270,7 @@ module.exports = {
         '"Courier New"',
         'monospace',
       ],
-      display: ['IBM Plex Sans',],
+      display: ['Poppins',],
       body: ['Open Sans',],
     },
     fontSize: {

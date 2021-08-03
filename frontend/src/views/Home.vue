@@ -1,57 +1,87 @@
 <template>
-  <div id="home" class="wrapper bg-purple-50 min-h-screen p-4 flex flex-col pb-32 items-center">
-    <!-- Nav bar -->
-    <nav class="relative p-4 border-b border-purple-200 lg:w-6/12 w-full">
-      <ul class="flex flex-row items-center">
-        <img src="../assets/logo-transparent-dark.png" class="w-14 h-14"/>
-        <div class="text-secondary bg-purple-100 px-4 h-12 flex justify-center items-center rounded-full ml-auto mr-4">
-          🔥 {{ streak }}
-        </div>
-        <button @click="showMenu = !showMenu" class="w-12 h-12 rounded-lg text-secondary bg-purple-100"><i class="fas fa-bars"></i></button>
-      </ul>
+  <div id="home" class="wrapper bg-purple-50 min-h-screen flex flex-col pb-24"> 
 
-      <!-- Hamburger menu -->
-    <div v-if="showMenu" class="absolute bottom-0 right-0 -mb-40 mr-4 bg-purple-100 shadow-sm flex w-8/12 md:w-4/12 rounded-md overflow-hidden">
-      <ul class="flex flex-col w-full">
-        <li class="text-sm px-4 py-3 text-text">Signed in as <span class="font-medium">{{ email }}</span></li>
-        <div class="bg-purple-200 w-full" style="height: 1px;"></div>
-        <button @click="$router.push({name: 'modules'});"  class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200">
-          My Modules
-        </button>
-        <button @click="$router.push({ name: 'profile' })" class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200 focus:bg-purple-200">
-          Profile
-        </button>
-        <div class="bg-purple-200 w-full" style="height: 1px;"></div>
-        <button @click="logout" class="text-sm text-text py-2 text-left px-4 hover:bg-purple-200 focus:bg-purple-200">
-          Sign Out
-        </button>
-      </ul>
-    </div>
-    </nav>
-      
-    <div v-if="!loading" class="lg:w-6/12 w-full">
-      <!-- Explore tab with modules, enrolled cohorts etc. -->
-      <div v-if="openTab == 'Explore'" id="explore-tab">
-        <h1 class="font-display text-2xl text-secondary pl-4 mt-6">Explore Modules 🧠</h1> 
-        <ModuleListElement v-for="module in modules" @click.native="moduleOpen(module)" :key="module.id" :title="module.title" :id="module.id" :description="module.description" :image="module.image" :duration="module.duration"/>
+    <div v-if="!loading" class="lg:w-6/12 w-full flex-grow flex flex-col">
+
+      <div v-if="openTab == 'Explore'" id="explore-tab" class="pt-6 flex-grow flex flex-col items-center px-6">
+        <img src="../assets/planet.svg" class="w-8/12"/>
+        <h1 class="font-display text-3xl mt-4 font-bold">{{ coreData.currentPlanet.planet.name }}</h1>
+        <h2 class="font-display text-lg text-secondary">{{ coreData.currentPlanet.planet.starSystem.name }}</h2>
+        
+        <div class="mt-2 flex">
+          <Chip class="w-20 mt-1 mr-2">{{ coreData.coins }} 🪙</Chip>
+          <Chip class="w-20 mt-1">{{ coreData.energy }} ⚡</Chip>
+        </div>
+
+        <span class="font-body text-lg text-text mt-6 self-start font-semibold">Mining Status</span>
+        <div class="h-6 mt-2 relative w-full rounded-full overflow-hidden">
+          <div class="w-full h-full bg-purple-100 absolute"></div>
+          <div class="h-full bg-primary absolute" v-bind:style="progressBarStyle"></div>
+        </div>
+        <div class="shadow-sm px-6 py-3 bg-white rounded-md flex items-center w-full mt-8">
+          <img src="../assets/planets.svg" class="w-12">
+          <div class="ml-6">
+            <h1 class="font-normal text-text text-lg">Visit another planet</h1>
+            <Chip class="w-20 mt-1">10 ⚡</Chip>
+          </div>
+        </div>
+        <div class="shadow-sm px-6 py-3 bg-white rounded-md flex items-center w-full mt-3">
+          <img src="../assets/galaxy.svg" class="w-12">
+          <div class="ml-6">
+            <h1 class="font-normal text-text text-lg">Visit nearby starsystem</h1>
+            <Chip class="w-20 mt-1">30 ⚡</Chip>
+          </div>
+        </div>
+        <div class="shadow-sm px-6 py-3 bg-white rounded-md flex items-center w-full mt-3">
+          <img src="../assets/rocket.svg" class="w-12">
+          <div class="ml-6">
+            <h1 class="font-normal text-text text-lg">Recharge rocket</h1>
+            <Chip class="w-20 mt-1">100 🪙</Chip>
+          </div>
+        </div>
       </div>
-
-      <!-- Learning tab with daily review, lessons and tutorials -->
-      <div v-if="openTab == 'Learn'" id="learn-tab">
-        <DailyReviewCard :dailyReviewCards="this.dailyReviewCards" class="mt-4" />
-        <!-- Daily lecture section -->
-        <h1 class="font-display text-2xl text-secondary pl-4 mt-8">Today's Lecture</h1> 
-        <DailyLectureCard class="mt-4" :todayLecture="this.todayLecture" :token="this.token" /> 
-        <button class="bg-purple-200 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-4" @click="activeLecturesOpen()">View previous lectures...</button>
-        <h1 class="font-display text-2xl text-secondary pl-4 mt-8 font-normal mb-2">Upcoming Tutorials</h1>
-
-        <!-- Generating Tutorial List -->
-        <div v-if="upcomingTutorials.length == 0" class="shadow-sm bg-white rounded-md flex flex-col justify-center items-center py-6 mt-4">
-          <img src="../assets/relax.png" class="w-24" />
-          <h3 class="font-display text-lg text-text font-medium pt-4">No upcoming tutorials</h3>
-          <h6 class="font-display text-md text-text">Looks like you can relax for a while!</h6>
+      
+      <div v-if="openTab == 'Challenges'" id="learn-tab" class="pt-10 flex-grow">
+        <h1 class="text-3xl font-display font-bold max-w-0 px-10 text-secondary">Mining Activities</h1>
+        <div class="px-4 pt-4">
+          <DailyReviewCard :dailyReviewCards="dailyReviewCards" />
         </div>
-        <TutorialListElement v-else v-for="tutorial in upcomingTutorials" :key="tutorial.id" :title="tutorial.title" :datetime="tutorial.scheduled_time" class="mt-2" />
+
+        <h2 class="text-2xl font-semibold mt-6 mb-3 px-10 text-text">Challenges</h2>
+        <ChallengeStatus v-if="activeChallenge.length != 0" :challenge="activeChallenge[0]" class="mx-4" />
+        <div v-else  class="overflow-x-auto flex flex-nowrap my-auto pl-4 h-full horizontal">
+          <ChallengeAccept v-for="challenge in testChallenges" :key="challenge.challenge.id" :challenge="challenge" class="min-w-50 mr-4" />
+        </div>
+
+        <h2 class="text-2xl font-semibold mt-6 mb-3 px-10 text-text">Tutorials</h2>
+        <TutorialCohortStatus v-if="coreData.activeCohort != null" :tutorial="coreData.activeCohort" class="mx-4" />
+        <div v-else class="overflow-x-auto flex flex-nowrap my-auto pl-4 h-full horizontal">
+          <TutorialEnroll v-for="tutorial in testTutorials" :key="tutorial.id" :tutorial="tutorial" class="min-w-50 mr-4" />
+        </div>
+      </div>
+      
+      <div v-if="openTab == 'Learn'" id="learn-tab" class="pt-10 flex-grow flex flex-col justify-center">
+        <h1 class="text-3xl font-display font-bold max-w-0 px-10 text-secondary">Gather Knowledge</h1>
+        <input v-model="search" type="text" placeholder="Search for any knowledge..." class="bg-purple-100 p-2 rounded font-display border border-transparent focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent mt-4 placeholder-purple-300 mx-6" :disabled="loading">
+        <div class="overflow-x-auto flex flex-nowrap my-auto pl-4 h-full horizontal">
+          <LectureCard v-for="lecture in lectures" :key="lecture.id" :lecture="lecture" :token="token" class="lectureCard" />
+        </div>
+      </div>
+      
+      <div v-if="openTab == 'Me'" id="me-tab" class="pt-10 flex-grow flex flex-col px-8">
+        <img src="../assets/spaceship.svg" class="w-6/12"/>
+        <h1 class="font-display text-xl mt-4 font-bold">{{ coreData.firstName }}</h1>
+        <h2 class="font-display text-xl text-text">{{ coreData.lastName }}</h2>
+        <span class="font-display text-sm text-accent mt-1">Probably somewhere trying to draw a rock</span>
+        <p class="font-body text-md text-text mt-6">I’m an aspiring polymath, on a mission to bring optimism and curiosity back to the world. I want to help people by spreading positivity and creating technologies that solve real problems.</p>
+        <div class="flex flex-wrap w-full mt-4">
+          <Chip v-for="topic in coreData.masteredTopics" :key="topic.id" class="mt-2 mr-2">{{ topic.name }}</Chip>
+          <Chip class="mt-2 mr-2 font-bold">+ 30</Chip>
+        </div>
+        
+        <button class="bg-purple-100 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-6">View History</button>
+        <button class="bg-purple-100 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-2">Edit Profile</button>
+        <button class="bg-purple-100 w-full font-display font-light text-secondary py-2 px-6 rounded flex mt-2" @click="logout">Logout</button>
       </div>
     </div>
 
@@ -61,35 +91,41 @@
     </div>
 
     <!-- Floating tab buttons -->
-    <div class="fixed inset-x-0 bottom-0 mb-8 bg-white shadow-lg mx-auto flex w-9/12 lg:w-4/12 h-16 rounded-full justify-around overflow-hidden">
-      <button class="w-6/12 font-display focus:outline-none" @click="setActiveTab('Explore')"
-        v-bind:class="{ 'bg-purple-100': exploreTabOpen, 'text-secondary': exploreTabOpen, 'text-text': exploreTabOpen}">
-        🌎 <span class="pl-1" v-bind:class="{ 'font-medium': exploreTabOpen }">Explore</span>
-      </button>
-      <div class="h-full bg-purple-200" style="width: 1px;"></div>
-      <button class="w-6/12 font-display focus:outline-none" @click="setActiveTab('Learn')" 
-        v-bind:class="{ 'bg-purple-100': learnTabOpen, 'text-secondary': learnTabOpen, 'text-text': learnTabOpen }">
-        📖 <span class="pl-1" v-bind:class="{ 'font-medium': learnTabOpen }">Learn</span>
-      </button>
+    <div class="fixed inset-x-0 bottom-0">
+      <div class="mb-6 bg-white shadow-lg mx-4 flex lg:w-4/12 h-16 rounded-lg justify-around overflow-hidden">
+        <button class="w-4/12 text-2xl focus:outline-none" @click="setActiveTab('Explore')"
+          v-bind:class="{ 'bg-purple-100': exploreTabOpen, 'text-secondary': exploreTabOpen }">
+          <i class="fas fa-globe-europe"></i> 
+        </button>
+        <button class="w-4/12 text-2xl focus:outline-none" @click="setActiveTab('Challenges')"
+          v-bind:class="{ 'bg-purple-100': challengesTabOpen, 'text-secondary': challengesTabOpen }">
+          <i class="fas fa-space-shuttle"></i>
+        </button>
+        <button class="w-4/12 text-2xl focus:outline-none" @click="setActiveTab('Learn')" 
+          v-bind:class="{ 'bg-purple-100': learnTabOpen, 'text-secondary': learnTabOpen }">
+          <i class="fas fa-graduation-cap"></i>
+        </button>
+        <button class="w-4/12 text-2xl focus:outline-none" @click="setActiveTab('Me')" 
+          v-bind:class="{ 'bg-purple-100': meTabOpen, 'text-secondary': meTabOpen }">
+          <i class="fas fa-user-astronaut"></i>
+        </button>
+      </div>   
     </div>
   </div>
 </template>
 
 <script>
-import DailyReviewCard from '../components/DailyReviewCard.vue'
-import DailyLectureCard from '../components/DailyLectureCard.vue'
-import ModuleListElement from '../components/ModuleListElement.vue'
-import TutorialListElement from '../components/TutorialListElement.vue'
 import { MoonLoader } from '@saeris/vue-spinners'
 
+import Chip from '../components/Chip.vue'
+import LectureCard from '../components/LectureCard.vue'
+import DailyReviewCard from '../components/DailyReviewCard.vue'
+import TutorialEnroll from '../components/TutorialEnroll.vue'
+import TutorialCohortStatus from '../components/TutorialCohortStatus.vue'
+import ChallengeAccept from '../components/ChallengeAccept.vue'
+import ChallengeStatus from '../components/ChallengeStatus.vue'
 
-// Services
-import { getSelf } from '../services/LearnerService.js'
-import { getSelfActiveCohort } from '../services/CohortService.js'
-import { getLectureToday } from '../services/LectureService.js'
-import { getUpcomingTutorials } from '../services/TutorialService.js'
-import { getDailyReview } from '../services/ReviewService.js'
-import { getModules } from '../services/ModuleService.js'
+import { getCoreData, getDailyReview, getRecommendedLectures } from '../services/HomeService.js'
 
 import firebase from "firebase/app";
 import "firebase/auth";
@@ -97,58 +133,136 @@ import "firebase/auth";
 export default {
   name: 'App',
   components: {
-    DailyReviewCard,
-    DailyLectureCard,
-    ModuleListElement,
-    TutorialListElement,
+    Chip,
     MoonLoader,
+    LectureCard,
+    DailyReviewCard,
+    TutorialEnroll,
+    TutorialCohortStatus,
+    ChallengeAccept,
+    ChallengeStatus,
   },
   data: function () {
     return {
       loading: true,
       token: "",
       email: "",
-      streak: 0,
-      todayLecture: null,
-      upcomingTutorials: [],
-      dailyReviewCards: [],
-      modules: [],
-      openTab: "Learn",
-      showMenu: false,
-      existingCohort: {},
+      openTab: "Explore",
+      unsubAuth: null,
+      search: "",
+      coreData: null,
+      dailyReviewCards: null,
+      recommendedLectures: null,
+      testChallenges: [
+        {
+          status: "UNLOCKED",
+          challenge: {
+            title: "Design a simple logical ciruit",
+            subject: "Computer Science",
+            description: "Design a circuit to evaluate any simple logical statement",
+          }
+        },
+        {
+          status: "UNLOCKED",
+          challenge: {
+            title: "Build a half adder",
+            subject: "Computer Science",
+            description: "Using a digital design platform, build a half adder."
+          }
+        },
+        {
+          status: "UNLOCKED",
+          challenge: {
+            title: "Build a full adder",
+            subject: "Computer Science",
+            description: "Using a digital design platform, build a full adder to demonstrate bitwise adding",
+          },
+        },
+      ],
+      testTutorials: [
+        {
+          title: "Designing a 8-bit CPU",
+          topic: "Computer architecture",
+          description: "Run through the process of designing a basic 8-bit CPU",
+        },
+        {
+          title: "Python Fractal Generator",
+          topic: "Introduction to Python",
+          description: "Create a Mendelbrot Set using Python to visualise fractals",
+        },
+      ],
+      lectures: [
+        {
+          id:1,
+          title: "Electronic Computing",
+          subject: "Computer Science",
+          description: "Learn all about electronic computing and be aware of the 1819 census",
+          video_link: "https://www.youtube.com/embed/LN0ucKNX0hc"
+        },
+        {
+          id:2,
+          title: "Electronic Computing",
+          subject: "Computer Science",
+          description: "Learn all about electronic computing and be aware of the 1819 census",
+          video_link: "https://www.youtube.com/embed/LN0ucKNX0hc"
+        },
+        {
+          id:3,
+          title: "Electronic Computing",
+          subject: "Computer Science",
+          description: "Learn all about electronic computing and be aware of the 1819 census",
+          video_link: "https://www.youtube.com/embed/LN0ucKNX0hc"
+        }
+      ],
     }
   },
   computed: {
+    progressBarStyle: function() {
+      return {
+        width: this.coreData.currentPlanet.minedKnowledge + '%'
+      }
+    },
+    activeChallenge: function() {
+      return this.testChallenges.filter((challenge) => challenge.status == "INPROGRESS")
+    },
+    availableChallenges: function() {
+      return this.testChallenges.filter((challenge) => challenge.status == "UNLOCKED")
+    },
+    // Tab State Handlers
     learnTabOpen: function () {
       return this.openTab == "Learn"
     },
     exploreTabOpen: function () {
       return this.openTab == "Explore"
     },
+    meTabOpen: function () {
+      return this.openTab == "Me"
+    },
+    challengesTabOpen: function () {
+      return this.openTab == "Challenges"
+    },
   },
   created: async function () {
     this.loading = true
 
     // Based on observer
-    firebase.auth().onAuthStateChanged(async (user) => {
+    this.unsubAuth = firebase.auth().onAuthStateChanged(async (user) => {
+      console.log("Home")
       this.loading = true
       if (user) {
-        this.token = await user.getIdToken(true) 
-        
-        // Get all the important data
-        let self = await getSelf(this.token)
+        this.token = await user.getIdToken(true)
+        this.email = user.email
 
-        // Check if everything is correct
-        if (self.first_name == "" || self.last_name == "") {
-          this.$router.push({ name: 'register' })
-        }
+        console.log(this.token)
 
-        this.email = self.email
-        this.streak = self.streak
-        
-        // Check if they are already enrolled in a cohort for this module
-        this.existingCohort = await getSelfActiveCohort(this.token)
-        await this.retrieveLearnerTabData()
+        // set the localstorage
+        localStorage.setItem("FB_TOKEN", this.token)
+        localStorage.setItem("EMAIL", user.email)
+
+        // Get the core data 
+        let res = await getCoreData(this.token, this.email)
+        this.coreData = res.data.getLearner
+        console.log(this.coreData)
 
         this.loading = false
       } else {
@@ -157,63 +271,49 @@ export default {
       }
     })
   },
+  beforeDestroy() {
+    this.unsubAuth()
+  },
   methods: {
-    retrieveLearnerTabData: async function() {
-      if (this.existingCohort != null) {
-        // Get today's lecture if any
-        this.todayLecture = await getLectureToday(this.token)
-
-        // Get all the upcoming tutorials
-        this.upcomingTutorials = await getUpcomingTutorials(this.token, this.existingCohort.module)
-        if(this.upcomingTutorials.length != 0) {
-          this.upcomingTutorials.sort((a,b) => {
-            let d1 = new Date(a.scheduled_time)
-            let d2 = new Date(b.scheduled_time)
-
-            return d1 - d2
-          })
-        }
-      } else {
-        this.todayLecture = null
-        this.upcomingTutorials = []
-      }
-
-      // Get the daily review if there is one
-      this.dailyReviewCards = await getDailyReview(this.token)
-    },
-    retrieveExploreTabData: async function () {
-      this.modules = await getModules()
-    },
     setActiveTab: async function(tab) {
-      if(tab == "Learn") {
-        this.openTab = "Learn"
-        this.loading = true
-        await this.retrieveLearnerTabData()
-        this.loading = false
-      } else if (tab == "Explore") {
-        this.openTab = "Explore"
-        this.loading = true
-        await this.retrieveExploreTabData()
-        this.loading = false
-      } else {
-        return 
+      this.loading = true
+      if(tab == "Challenges") {
+        let res = await getDailyReview(this.token, this.email)
+        this.dailyReviewCards = res.data.getLearner.dailyReview
+      } else if(tab == "Learn") {
+        let res = await getRecommendedLectures(this.token, this.email)
+        this.recommendedLectures = res.data.getLearner.recommendedLectures
       }
+      this.openTab = tab
+      this.loading = false
     },
     logout: async function() {
       this.loading = true
       await firebase.auth().signOut();
-      this.$router.push({ name: "login" })
-    },
-    moduleOpen: function (module) {
-      this.$router.push({name: 'module', params: { module: module }})
-    },
-    activeLecturesOpen() {
-      this.$router.push({ name: 'lectures', params: { module: this.existingCohort.module }})
     },
   },
 }
 </script>
 
 <style>
+.horizontal::-webkit-scrollbar {
+  display: none;
+}
+ 
+.horizontal {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+
+.lectureCard {
+  scroll-snap-align: center;
+  min-width: 80vw;
+}
+
+.min-w-50 {
+  scroll-snap-align: center;
+  min-width: 50vw;
+}
 
 </style>

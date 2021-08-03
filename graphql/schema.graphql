@@ -1,0 +1,426 @@
+type Learner @auth(
+  query: { rule: """
+    query ($USER: String!) {
+      queryLearner(filter: { email: { eq: $USER } } ) {
+        email
+      }
+    }"""
+  },
+  add: { rule: """
+    query ($USER: String!) {
+      queryLearner(filter: { email: { eq: $USER } } ) {
+        email
+      }
+    }"""
+  },
+  delete: { rule: """
+    query ($USER: String!) {
+      queryLearner(filter: { email: { eq: $USER } } ) {
+        email
+      }
+    }"""
+  },
+  update: { rule:  "{$DENIED: { eq: \"DENIED\" } }"}
+) @generate(
+  query: {
+    get: true,
+    query: true,
+    aggregate: false,
+  },
+  mutation: {
+    add: true,
+    delete: true,
+    update: false,
+  }
+  subscription: false
+)
+{
+  email: String! @id
+  firstName: String!
+  lastName: String!
+  timezone: String!
+
+  completedLectures: [Lecture!]! @hasInverse(field: completedLearners)
+  cards: [LearnerReviewCard!]! @hasInverse(field: learner)
+  challenges: [LearnerChallenge!]! @hasInverse(field: learner)
+  unlockedTutorials: [Tutorial!]!
+  activeCohort: TutorialCohort
+  masteredTopics: [Topic!]!
+
+  # Gamification Elements
+  currentPlanet: LearnerPlanet!
+  energy: Int!
+  coins: Int!
+
+  recommendedLectures: [Lecture!]! @custom(http: {
+    url: "http://192.168.10.139:8003/api/v0.3/lecture/recommended"
+    method: "GET",
+    body: "{ email: $email }",
+    forwardHeaders: ["Authorization"]
+  })
+  dailyReview: [RemoteLearnerReviewCard!]! @custom(http: {
+    url: "http://192.168.10.139:8003/api/v0.3/review"
+    method: "GET",
+    body: "{ email: $email }",
+    forwardHeaders: ["Authorization"]
+  })
+}
+
+type LearnerPlanet @generate(
+  query: {
+    get: true,
+    query: true,
+    aggregate: false,
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false,
+  }
+  subscription: false
+) @auth(
+  query: { rule: """ 
+    query ($USER: String!) {
+      queryLearnerPlanet {
+        learner(filter: { email: { eq: $USER } } ) {
+          email
+        }
+      }
+    }"""
+  }
+)
+{
+  id: ID!
+  planet: Planet!
+  learner: Learner!
+  minedKnowledge: Int!
+  completed: Boolean!
+}
+
+type LearnerReviewCard @generate(
+  query: {
+    get: true,
+    query: true,
+    aggregate: false,
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false
+  },
+  subscription: false
+) @auth(
+  query: { rule: """ 
+    query ($USER: String!) {
+      queryLearnerReviewCard {
+        learner(filter: { email: { eq: $USER } } ) {
+          email
+        }
+      }
+    }"""
+  }
+)
+{
+  id: ID!
+  reviewCard: ReviewCard!
+  learner: Learner!
+  repeat: Int!
+  selected: DateTime!
+}
+
+type LearnerChallenge @generate( 
+  query: {
+    get: true,
+    query: true,
+    aggregate: false
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false
+  },
+  subscription: false
+) @auth(
+  query: { rule: """ 
+    query ($USER: String!) {
+      queryLearnerChallenge {
+        learner(filter: { email: { eq: $USER } } ) {
+          email
+        }
+      }
+    }"""
+  }
+)
+{
+  challenge: Challenge!
+  learner: Learner!
+  status: ChallengeStatus!
+}
+
+type Planet @generate(
+  query: {
+    get: false,
+    query: false,
+    aggregate: false,
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false,
+  }
+  subscription: false
+)
+{
+  id: ID!
+  name: String!
+  starSystem: StarSystem!
+}
+
+type StarSystem @generate(
+  query: {
+    get: false,
+    query: false,
+    aggregate: false,
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false,
+  }
+  subscription: false
+)
+{
+  id: ID!
+  name: String!
+  planets: [Planet!]! @hasInverse(field: starSystem)
+  nearbySystems: [StarSystem!]!
+}
+
+# Organising the content
+type Subject @generate(
+  query: {
+    get: false,
+    query: false,
+    aggregate: false
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false
+  },
+  subscription: false
+)
+{
+  id: ID!
+  name: String!
+}
+
+type Topic @generate(
+  query: {
+    get: false,
+    query: false,
+    aggregate: false
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false
+  },
+  subscription: false
+)
+{
+  id: ID!
+  name: String!
+  label: String! @search(by: [exact])
+
+  subject: Subject!
+  preReqs: [Topic!]! @hasInverse(field: postReqs)
+  postReqs: [Topic!]!
+}
+
+type Lecture @generate ( 
+  query: {
+    get: false,
+    query: false,
+    aggregate: false
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false
+  },
+  subscription: false
+)
+{
+  id: ID!
+  title: String!
+  label: String! @search(by: [exact])
+  description: String!
+  videoLink: String
+
+  # Knowledge Graph
+  topic: Topic!
+  preReqs: [Lecture!]! @hasInverse(field: postReqs)
+  postReqs: [Lecture!]!
+
+  cards: [ReviewCard!]! @hasInverse(field: lecture)
+
+  # Learner
+  completedLearners: [Learner!]!
+
+  # Challenges that the lecture is required to unlock
+  unlocksChallenges: [Challenge!]!
+}
+
+type Tutorial @generate( 
+  query: {
+    get: false,
+    query: false,
+    aggregate: false
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false
+  },
+  subscription: false
+)
+{
+  id: ID!
+  title: String!
+  label: String! @search(by: [exact])
+  description: String!
+
+  requiredChallenges: [Challenge!]! @hasInverse(field: unlocksTutorials)
+}
+
+enum TutorialStatus {
+  FILLING,
+  FULL,
+  ONGOING,
+  DONE
+}
+
+type TutorialCohort @generate( 
+  query: {
+    get: false,
+    query: false,
+    aggregate: false
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false
+  },
+  subscription: false
+)
+{
+  id: ID!
+  tutorial: Tutorial!
+  status: TutorialStatus!
+  members: [Learner!]!
+}
+
+type ReviewCard @generate( 
+  query: {
+    get: false,
+    query: false,
+    aggregate: false
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false
+  },
+  subscription: false
+)
+{
+  id: ID!
+  topText: String!
+  bottomText: String!
+  lecture: Lecture!
+}
+
+# Challenge
+enum ChallengeStatus {
+  UNLOCKED
+  INPROGRESS
+  COMPLETED
+}
+
+type Challenge @generate(
+  query: {
+    get: false,
+    query: false,
+    aggregate: false
+  },
+  mutation: {
+    add: false,
+    delete: false,
+    update: false
+  },
+  subscription: false
+)
+{
+  id: ID!
+  title: String!
+  label: String! @search(by: [exact])
+  description: String!
+  
+  requiredLectures: [Lecture!]! @hasInverse(field: unlocksChallenges)
+  unlocksTutorials: [Tutorial!]!
+}
+
+# Complete Lecture mutation usually returns a review
+type CompleteLectureReward @remote {
+  cards: [LearnerReviewCard!]!
+  challenges: [LearnerChallenge!]!
+}
+
+type RemoteLearnerReviewCard @remote {
+  id: ID!
+  reviewCard: ReviewCard!
+  learner: Learner!
+  repeat: Int!
+  selected: DateTime!
+}
+
+type Mutation {
+  completeLecture(id: ID!): CompleteLectureReward! @custom(http: {
+    url: "http://192.168.10.139:8003/api/v0.3/lecture/complete?lectureId=$id"
+    method: "POST",
+    forwardHeaders: ["Authorization"]
+  })
+  
+  passReviewCard(id: ID!): Boolean @custom(http: {
+    url: "http://192.168.10.139:8003/api/v0.3/review/card/pass?reviewCardId=$id"
+    method: "POST",
+    forwardHeaders: ["Authorization"]
+  })
+
+  failReviewCard(id: ID!): Boolean @custom(http: {
+    url: "http://192.168.10.139:8003/api/v0.3/review/card/fail?reviewCardId=$id"
+    method: "POST",
+    forwardHeaders: ["Authorization"]
+  })
+
+  completeReview: Boolean @custom(http: { 
+    url: "http://192.168.10.139:8003/api/v0.3/review/complete"
+    method: "POST",
+    forwardHeaders: ["Authorization"]
+  })
+
+  completeChallenge(id: ID!): [Tutorial!]! @custom(http: {
+    url: "http://192.168.10.139:8003/api/v0.3/challenge/complete?challengeId=$id"
+    method: "POST",
+    forwardHeaders: ["Authorization"]
+  })
+  
+  enrollTutorial(id: ID!): Boolean @custom(http: {
+    url: "http://192.168.10.139:8003/api/v0.3/tutorial/enroll?tutorialId=$id"
+    method: "POST",
+    forwardHeaders: ["Authorization"]
+  })
+}
+
+# Dgraph.Authorization {"JWKUrl":"https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com", "Namespace": "https://dgraph.io/jwt/claims", "Audience": ["axiom-20a6e"], "Header": "Authorization"}

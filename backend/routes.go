@@ -10,25 +10,25 @@ import (
 func (s *server) routes() {
 
 	// Lecture handlers
-	s.router.HandleFunc("/lecture/complete", s.handleCompleteLecture()).Methods("POST", "OPTIONS")
-	s.router.HandleFunc("/lecture/recommended", s.handleRecommendedLectures()).Methods("GET", "OPTIONS")
+	s.router.HandleFunc("/api/v0.3/lecture/complete", s.handleCompleteLecture()).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/v0.3/lecture/recommended", s.handleRecommendedLectures()).Methods("GET", "OPTIONS")
 
 	// Review handlers
-	s.router.HandleFunc("/review", s.handleDailyReview()).Methods("GET", "OPTIONS")
-	s.router.HandleFunc("/review/complete", s.handleCompleteReview()).Methods("POST", "OPTIONS")
-	s.router.HandleFunc("/review/card/pass", s.handlePassReviewCard()).Methods("POST", "OPTIONS")
-	s.router.HandleFunc("/review/card/fail", s.handleFailReviewCard()).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/v0.3/review", s.handleDailyReview()).Methods("GET", "OPTIONS")
+	s.router.HandleFunc("/api/v0.3/review/complete", s.handleCompleteReview()).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/v0.3/review/card/pass", s.handlePassReviewCard()).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/v0.3/review/card/fail", s.handleFailReviewCard()).Methods("POST", "OPTIONS")
 
 	// Challenge handlers
-	s.router.HandleFunc("/challenge/accept", s.handleAcceptChallenge()).Methods("POST", "OPTIONS")
-	s.router.HandleFunc("/challenge/complete", s.handleCompleteChallenge()).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/v0.3/challenge/accept", s.handleAcceptChallenge()).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/v0.3/challenge/complete", s.handleCompleteChallenge()).Methods("POST", "OPTIONS")
 
 	// Tutorial handlers
-	s.router.HandleFunc("/tutorial/enroll", s.handleEnrollTutorial()).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/v0.3/tutorial/enroll", s.handleEnrollTutorial()).Methods("POST", "OPTIONS")
 
 	// Game handlers
-	s.router.HandleFunc("/planet/goto", s.handleGotoPlanet()).Methods("POST", "OPTIONS")
-	s.router.HandleFunc("/starsystem/goto", s.handleGotoStarsystem()).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/v0.3/planet/goto", s.handleGotoPlanet()).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/v0.3/starsystem/goto", s.handleGotoStarsystem()).Methods("POST", "OPTIONS")
 
 	s.router.Use(s.corsMiddleware)
 	s.router.Use(s.authMiddleware)

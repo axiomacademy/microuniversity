@@ -47,10 +47,10 @@ export default {
       return this.cards.length
     },
     topText: function() {
-      return this.cards[this.index].top_side
+      return this.cards[this.index].reviewCards.topText
     },
     bottomText: function() {
-      return this.cards[this.index].bottom_side
+      return this.cards[this.index].reviewCards.bottomText
     },
   },
   created: async function() {

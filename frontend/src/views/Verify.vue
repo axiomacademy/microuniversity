@@ -18,7 +18,7 @@
 
 <script>
 import { MoonLoader } from '@saeris/vue-spinners'
-import { getSelf } from '../services/LearnerService'
+import { getSelf } from '../services/LoginService'
 import firebase from "firebase/app";
 import "firebase/auth";
 
@@ -33,8 +33,6 @@ export default {
     }
   },
   mounted: async function () {
-    console.log("Verify page reached")
-
     if (firebase.auth().isSignInWithEmailLink(window.location.href)) {
       let email = window.localStorage.getItem('emailForSignIn');
       if (!email) {
@@ -48,11 +46,19 @@ export default {
         window.localStorage.removeItem('emailForSignIn');
         
         // CHeck if they're a new user
-        let token = await firebase.auth().currentUser.getIdToken(true)
-        console.log(token)
-        let self = await getSelf(token)
+        let user = firebase.auth().currentUser
+        let token = await user.getIdToken()
+        let email = await user.email
         
-        if (self.first_name == "" || self.last_name == "") {
+        // Store the token in localStorage
+        localStorage.setItem("FB_TOKEN", token)
+        localStorage.setItem("EMAIL", user.email)
+        
+        // CHeck if they're a new user
+        let res = await getSelf(token, user.email)
+
+        if (res.data.getLearner == null) {
+          // Go to the account creation page
           this.$router.push({ name: 'register' })
         } else {
           this.$router.push({ name: 'home'})
